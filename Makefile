@@ -20,8 +20,8 @@ validate: ## Validate the environment configuration
 plan: ## Show the pending changes
 	@terraform -chdir=$(TF_DIR) plan
 
-apply up: ## Apply the pending changes
+apply: ## Apply the pending changes
 	@terraform -chdir=$(TF_DIR) apply
 
-destroy down: ## Destroy the environment
+destroy: ## Destroy the environment
 	@terraform -chdir=$(TF_DIR) destroy
