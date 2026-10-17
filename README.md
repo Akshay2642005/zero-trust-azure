@@ -12,10 +12,15 @@
 
 [Architecture](#architecture) ·
 [Microsegmentation](#microsegmentation) ·
+[Build walkthrough](#build-walkthrough) ·
 [Getting started](#getting-started) ·
 [Modules](#modules-and-the-private-registry) ·
 [Security](#security-posture) ·
 [Inputs & outputs](#inputs)
+
+![Zero-Trust Azure Network](docs/cover.png)
+
+<sub>Built for the <a href="https://nextwork.ai/projects/9627fa86-3b65-4e7e-a83c-69105c804da2">NextWork “Zero Trust Network on Azure with Terraform”</a> project · by <strong>Akshay B</strong></sub>
 
 </div>
 
@@ -45,6 +50,7 @@ every exception is explicit, reviewed and visible in one place.
 - [Private data plane](#private-data-plane)
 - [Delivery and authentication](#delivery-and-authentication)
 - [What it builds](#what-it-builds)
+- [Build walkthrough](#build-walkthrough)
 - [Repository layout](#repository-layout)
 - [Getting started](#getting-started)
 - [Modules and the private registry](#modules-and-the-private-registry)
@@ -53,6 +59,7 @@ every exception is explicit, reviewed and visible in one place.
 - [Inputs](#inputs)
 - [Outputs](#outputs)
 - [Skills demonstrated](#skills-demonstrated)
+- [Reflections and takeaways](#reflections-and-takeaways)
 - [License](#license)
 
 ## Architecture
@@ -164,6 +171,21 @@ anywhere.*
 | `pe-storage-blob` | private endpoint + DNS zone group |
 | `deny-public-ip-on-nic` | Azure Policy assignment, enforced; denies NICs with a public IP |
 
+## Build walkthrough
+
+The project was built in six stages, each adding a layer of the Zero Trust
+posture. The full step-by-step journal — with the reasoning and screenshots from
+each stage — is in [`docs/WRITEUP.md`](docs/WRITEUP.md).
+
+| Stage | What I built | Key takeaway |
+|-------|--------------|--------------|
+| **1. Architecture intent** | Framed the whole design around "nothing is trusted by default". | Zero Trust is a *default*, not a set of add-ons — every allowance must be explicit. |
+| **2. Setup & Azure auth** | Terraform + HCP Terraform workspace, `azurerm` pinned at `4.81.0`, OIDC federation to Azure. | **Version pinning** guarantees reproducible runs; **OIDC** removes the stored secret entirely. |
+| **3. Hub-spoke network** | One hub, two spokes, and a deny-all NSG on every workload subnet. | Deny-all **enforces "assume breach"** — unlisted traffic is treated as hostile. |
+| **4. Private storage** | Storage account with public access disabled, a private endpoint, and a linked private DNS zone. | The private endpoint gives the account a **private IP inside the VNet**, so the NSGs actually protect the data. |
+| **5. Policy guardrail** | An enforced Azure Policy assignment denying public IPs on NICs. | Policy enforces on the **control plane at deploy time**; NSGs enforce on the **data plane at runtime** — defense in depth. |
+| **6. Second spoke & microsegmentation** | A second isolated spoke with a single priority-`100` HTTPS allow above the `4096` deny-all. | **Priority ordering** makes microsegmentation the default: one narrow allow, everything else denied. |
+
 ## Repository layout
 
 ```
@@ -180,7 +202,9 @@ anywhere.*
 │   ├── setup-oidc.rb        wire HCP Terraform ↔ Azure OIDC federation
 │   └── teardown-oidc.rb     reverse the OIDC setup
 ├── docs/
-│   ├── ARCHITECTURE.md
+│   ├── ARCHITECTURE.md      technical reference: topology, modules, state
+│   ├── WRITEUP.md           step-by-step build journal (the NextWork project)
+│   ├── cover.png            project cover image
 │   └── diagrams/            Excalidraw-exported architecture diagrams (SVG)
 ├── Makefile
 └── README.md
@@ -376,8 +400,38 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
 **Azure networking** · **hub-and-spoke topology** · **zero-trust and
 microsegmentation** · **NSG and Azure Policy design** · **Private Link and
 private DNS** · **Terraform module design** · **private module registry** ·
-**remote state** · **OIDC federation** · **CI/CD** · **Bash and Ruby
-automation**
+**remote state** · **OIDC federation** · **least-privilege RBAC** · **CI/CD** ·
+**Bash and Ruby automation**
+
+## Reflections and takeaways
+
+**What I set out to learn.** To design and ship a genuinely default-deny, Zero
+Trust network on Azure — turning a security *principle* into enforced
+*infrastructure*: deny-all NSGs where exceptions are explicit and
+priority-ordered, a private-only data plane, and a policy guardrail that keeps
+the topology from drifting back to public exposure.
+
+**Key tools and concepts learned.** Building an Azure network where security is
+enforced by construction — **Terraform modules**, **HCP Terraform's private
+registry and remote state**, and **secretless OIDC** — and where **Zero Trust,
+microsegmentation, and control-plane-vs-data-plane enforcement** are expressed
+as code: default-deny NSGs with priority-ordered allow-by-exception rules, plus
+an Azure Policy guardrail. Just as valuable was learning a control's *boundaries*
+— for example, that the policy stops a public IP being *attached* to a NIC but
+not *created*.
+
+**Time and challenges.** About **1 hour** end to end — most of it spent
+designing the modules and debugging policy and peering edge cases rather than
+writing the Terraform itself.
+
+**Personal reflection.** I did this project to learn how to build secure,
+production-shaped Azure infrastructure the way a platform team would.
+
+**What I want to learn next.** Extending this posture into **Azure Policy as
+code** (`deployIfNotExists` / `modify` effects with auto-remediation) and into a
+real **CI/CD pipeline** with policy-as-code checks and automated tests for the
+Terraform — security that is not just enforced by construction, but continuously
+enforced by automation.
 
 ## License
 
