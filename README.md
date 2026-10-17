@@ -1,146 +1,263 @@
-# Zero-Trust Azure Network (Terraform)
+<div align="center">
 
-A production-oriented, hub-and-spoke network on Azure: a default-deny network
-fabric, a private-only storage workload reachable solely through a private
-endpoint, and a control-plane guardrail that blocks public IPs on network
-interfaces.
+# Zero-Trust Azure Network
 
-The configuration is split into reusable modules with a single environment
-root, so the same fabric can be deployed to any number of environments.
+**A default-deny, hub-and-spoke network on Microsoft Azure — built as reusable Terraform modules and deployed through HCP Terraform with remote state and secretless OIDC authentication.**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Terraform](https://img.shields.io/badge/Terraform-%3E%3D%201.9-7B42BC?logo=terraform&logoColor=white)](https://www.terraform.io)
+[![azurerm](https://img.shields.io/badge/azurerm-4.81.0-0078D4?logo=microsoftazure&logoColor=white)](https://registry.terraform.io/providers/hashicorp/azurerm)
+[![HCP Terraform](https://img.shields.io/badge/HCP%20Terraform-remote%20runs-844FBA?logo=terraform&logoColor=white)](https://app.terraform.io)
+[![Zero Trust](https://img.shields.io/badge/zero--trust-default--deny-2ea44f)](#security-posture)
+
+[Architecture](#architecture) ·
+[Microsegmentation](#microsegmentation) ·
+[Getting started](#getting-started) ·
+[Modules](#modules-and-the-private-registry) ·
+[Security](#security-posture) ·
+[Inputs & outputs](#inputs)
+
+</div>
+
+---
+
+## Overview
+
+This project builds a small but production-shaped network on Azure the way a
+platform team would: a **hub-and-spoke fabric** where every workload subnet is
+**deny-all by construction**, a **private-only storage workload** reachable
+solely through a Private Link endpoint, and an **enforced policy guardrail**
+that blocks network interfaces from getting public IPs.
+
+Rather than one flat configuration, the fabric lives in **versioned Terraform
+modules** (`network`, `storage`, `policy`) published to the **HCP Terraform
+private registry** and consumed by the environment root, which runs remotely
+with **remote state** and authenticates to Azure through **OIDC — no stored
+client secret anywhere**.
+
+The result is an environment where the secure path is the default path, and
+every exception is explicit, reviewed and visible in one place.
+
+## Table of contents
+
+- [Architecture](#architecture)
+- [Microsegmentation](#microsegmentation)
+- [Private data plane](#private-data-plane)
+- [Delivery and authentication](#delivery-and-authentication)
+- [What it builds](#what-it-builds)
+- [Repository layout](#repository-layout)
+- [Getting started](#getting-started)
+- [Modules and the private registry](#modules-and-the-private-registry)
+- [Authentication (OIDC)](#authentication-oidc)
+- [Security posture](#security-posture)
+- [Inputs](#inputs)
+- [Outputs](#outputs)
+- [Skills demonstrated](#skills-demonstrated)
+- [License](#license)
 
 ## Architecture
 
-```
-                   ┌──────────────────────────────────────────────┐
-                   │                Resource group: zt-rg          │
-                   │                                              │
-   hub-vnet  ◄─────┼── bidirectional VNet peering ──►  spoke-vnet │
-   10.0.0.0/16     │                                    10.1.0.0/16│
-                   │  hub-default       spoke-workload            │
-                   │  10.0.1.0/24       10.1.0.0/24               │
-                   │                    spoke-private-endpoints   │
-                   │                    10.1.1.0/24               │
-                   │                                              │
-                   │  Default-deny NSGs on hub-default and        │
-                   │  spoke-workload.                             │
-                   │                                              │
-                   │  ztstorage (public access disabled)          │
-                   │      ▲                                       │
-                   │      └── pe-storage-blob (private endpoint)  │
-                   │              delegated into spoke-private-…  │
-                   │              resolved via privatelink.blob…  │
-                   │                                              │
-                   │  Policy: deny public IPs on NICs (enforced)  │
-                   └──────────────────────────────────────────────┘
-```
+![Hub-and-spoke topology](docs/diagrams/01-topology.svg)
 
-## Repository layout
+*One hub and two spokes inside `zt-rg`. The hub carries no NVA, so the two
+spokes peer directly when they need to talk. Every workload subnet sits behind
+its own deny-all NSG.*
 
-```
-modules/
-  network/   hub + two spoke VNets, subnets, default-deny NSGs, VNet peering
-  storage/   private storage account, blob private endpoint, private DNS zone
-  policy/    resource-group policy assignment (guardrails)
-envs/
-  dev/       the dev environment root: providers, backend, variables,
-             locals (naming + tags), module wiring and outputs
-```
+| Component | CIDR | Subnets |
+|---|---|---|
+| `hub-vnet` — the hub | `10.0.0.0/16` | `hub-default` `10.0.1.0/24` |
+| `spoke-vnet` — spoke 1 | `10.1.0.0/16` | `spoke-workload` `10.1.0.0/24`, `spoke-private-endpoints` `10.1.1.0/24` |
+| `spoke2-vnet` — spoke 2 | `10.2.0.0/16` | `spoke2-workload` `10.2.0.0/24` |
 
-Each module is self-contained: it declares its own inputs and outputs, takes a
-`naming` object so names live in one place, and tags everything it creates.
+The design separates **network segments** (VNets and subnets) from
+**policy** (security groups and Azure Policy), so a new segment can be added by
+extending the module inputs without touching the rules that guard the others.
 
-The modules are published to the HCP Terraform **private registry** and the dev
-root consumes them by version (`app.terraform.io/akshay2642005/<name>/azurerm`),
-so it no longer reaches up to `../../modules`. Publishing a new module version
-is a separate, explicit step — see [Usage](#usage).
+### Design principles
 
-## What it creates
+- **Default deny by construction.** Every workload subnet has an NSG that drops
+  all inbound *and* outbound traffic at priority `4096`; nothing is reachable
+  unless a higher-priority rule says so.
+- **Private by default.** No public data-plane endpoints. The storage account
+  has public network access disabled and is reachable only through a private
+  endpoint.
+- **Guardrails, not conventions.** An enforced Azure Policy assignment rejects
+  NICs with public IPs, so the environment can't quietly drift back to public
+  exposure.
+- **One explicit exception.** A single narrowly-scoped flow — HTTPS `443` from
+  spoke2 to spoke1 — is the only thing crossing the segment boundary.
+
+## Microsegmentation
+
+![Microsegmentation](docs/diagrams/02-microsegmentation.svg)
+
+*Deny-all everywhere, with exactly one allowed flow: HTTPS `443` from
+`spoke2-workload` to `spoke-workload`. It is expressed as two coordinated rules
+at priority `100` — an egress allow on spoke2 and an ingress allow on spoke1 —
+because NSG state does not cross NSG boundaries. Both beat the `4096` deny-alls.*
+
+The single logical flow is expressed as two rules and one route:
+
+| Element | Type | Where |
+|---|---|---|
+| `AllowHttpsToSpoke1Workload` | outbound allow, priority 100 | spoke2 NSG |
+| `AllowHttpsFromSpoke2` | inbound allow, priority 100 | spoke1 NSG |
+| `spoke_to_spoke2` / `spoke2_to_spoke` | VNet peering pair | both VNets |
+
+A direct peering is required because a hub-and-spoke topology alone does not
+route between spokes without a network virtual appliance (NVA). Everything else
+stays default-deny on both spokes — this is the pattern to copy when adding a
+third workload segment.
+
+## Private data plane
+
+![Private-only storage](docs/diagrams/04-private-storage.svg)
+
+*The storage account's public network access is disabled. Its blob endpoint
+resolves through `privatelink.blob.core.windows.net` to a private endpoint in
+`spoke-private-endpoints`, so it is reachable over the private address space
+only.*
+
+- **Hardened storage account** — StorageV2, TLS 1.2 minimum, HTTPS-only, public
+  network access disabled, nested (public) blob access disallowed, soft delete
+  enabled for blobs and containers.
+- **Private endpoint** — the blob service is published into
+  `spoke-private-endpoints`; its private IP is exported from the private service
+  connection.
+- **Private DNS** — `privatelink.blob.core.windows.net` is linked to the spoke
+  VNet so the storage FQDN resolves to the endpoint's private IP.
+
+The private-endpoints subnet is intentionally left **without** an NSG so
+private-link traffic is not dropped before it reaches the endpoint.
+
+## Delivery and authentication
+
+![Delivery architecture](docs/diagrams/03-deployment.svg)
+
+*`make plan` and `make apply` run remotely in HCP Terraform. Modules are pulled
+from the private registry at a pinned version. HCP Terraform authenticates to
+Azure through Microsoft Entra ID using OIDC federation — no client secret exists
+anywhere.*
+
+- **Remote runs and state** — HCP Terraform (Terraform Cloud) executes plans and
+  applies; state lives there and is never committed.
+- **Versioned modules** — the environment root consumes `network`, `storage` and
+  `policy` by version from the private registry, not by relative path.
+- **Secretless auth** — dynamic provider credentials via OIDC federation; the
+  workspace holds no long-lived Azure credential.
+
+## What it builds
 
 | Resource | Notes |
 |----------|-------|
 | Resource group | `zt-rg`, managed by Terraform |
 | `hub-nsg`, `spoke-nsg`, `spoke2-nsg` | default-deny inbound **and** outbound |
-| `hub-vnet` (10.0.0.0/16) | hub network |
-| `spoke-vnet` (10.1.0.0/16) | first workload network |
-| `spoke2-vnet` (10.2.0.0/16) | second, isolated workload segment |
+| `hub-vnet` `10.0.0.0/16` | the hub network |
+| `spoke-vnet` `10.1.0.0/16` | first workload network |
+| `spoke2-vnet` `10.2.0.0/16` | second, isolated workload segment |
 | `hub-default`, `spoke-workload`, `spoke2-workload` | subnets with the NSGs associated |
 | `spoke-private-endpoints` | open subnet reserved for private endpoints |
 | bidirectional peering | hub↔each spoke, plus a direct spoke1↔spoke2 pair |
-| HTTPS allow (spoke2 → spoke1) | the one exception to default-deny: 443 to the spoke1 workload subnet |
+| HTTPS allow (spoke2 → spoke1) | the one exception to default-deny: `443` to the spoke1 workload subnet |
 | `ztstorage` | StorageV2, TLS 1.2+, HTTPS-only, public access disabled |
 | `privatelink.blob.core.windows.net` | private DNS zone, linked to the spoke VNet |
 | `pe-storage-blob` | private endpoint + DNS zone group |
-| `deny-public-ip-on-nic` | Azure Policy assignment, enforced; denies NICs that have a public IP |
+| `deny-public-ip-on-nic` | Azure Policy assignment, enforced; denies NICs with a public IP |
 
-## Inputs
+## Repository layout
 
-| Name | Description | Default |
-|------|-------------|---------|
-| `subscription_id` | Target Azure subscription | — |
-| `location` | Azure region | `eastus` |
-| `environment` | Environment name used in tags | `dev` |
-| `storage_account_name` | Globally unique storage account name | — |
-| `hub_address_space` | Hub VNet address space | `["10.0.0.0/16"]` |
-| `spoke_address_space` | Spoke VNet address space | `["10.1.0.0/16"]` |
-| `hub_default_subnet_prefix` | Hub default subnet | `10.0.1.0/24` |
-| `spoke_workload_subnet_prefix` | Spoke workload subnet | `10.1.0.0/24` |
-| `spoke_pe_subnet_prefix` | Spoke private-endpoints subnet | `10.1.1.0/24` |
-| `spoke2_address_space` | Second spoke VNet address space | `["10.2.0.0/16"]` |
-| `spoke2_workload_subnet_prefix` | Second spoke workload subnet | `10.2.0.0/24` |
-| `allow_forwarded_traffic` | Allow forwarded traffic across peerings | `true` |
-| `tags` | Extra tags merged into the common tags | `{}` |
-
-## Outputs
-
-| Name | Description |
-|------|-------------|
-| `resource_group_name` | Resource group name |
-| `hub_vnet_id` | Hub VNet resource ID |
-| `spoke_vnet_id` | Spoke VNet resource ID |
-| `spoke2_vnet_id` | Second spoke VNet resource ID |
-| `storage_account_name` | Storage account name |
-| `storage_private_endpoint_id` | Blob private endpoint resource ID |
-| `storage_private_endpoint_ip` | Private IP allocated to the endpoint |
-| `policy_assignment_id` | Deny-public-IP-on-NIC assignment ID |
-
-## Usage
-
-State is held in HCP Terraform (Terraform Cloud). See `envs/dev/backend.tf`
-for the workspace configuration.
-
-```bash
-# One-time
-terraform login
-# edit envs/dev/backend.tf -> set your organization, then:
-make init
-
-# Per change
-make fmt        # terraform fmt -recursive
-make validate
-make plan
-make apply
-make destroy
+```
+.
+├── modules/
+│   ├── network/    hub + two spoke VNets, subnets, default-deny NSGs, peerings
+│   ├── storage/    private storage account, blob private endpoint, private DNS zone
+│   └── policy/     resource-group policy assignment (guardrails)
+├── envs/
+│   └── dev/        the dev environment root: providers, backend, variables,
+│                   locals (naming + tags), module wiring and outputs
+├── scripts/
+│   ├── publish-module.sh    publish a module version to the private registry
+│   ├── setup-oidc.rb        wire HCP Terraform ↔ Azure OIDC federation
+│   └── teardown-oidc.rb     reverse the OIDC setup
+├── docs/
+│   ├── ARCHITECTURE.md
+│   └── diagrams/            Excalidraw-exported architecture diagrams (SVG)
+├── Makefile
+└── README.md
 ```
 
-Copy `envs/dev/terraform.tfvars.example` to `envs/dev/terraform.tfvars`
-(git-ignored) and fill in `subscription_id` and `storage_account_name`.
+Each module is self-contained: it declares its own inputs and outputs, takes a
+`naming` object so names live in one place, and tags everything it creates.
 
-### Modules and the private registry
+## Getting started
 
-The root module consumes the shared modules from the HCP Terraform private
-registry, pinned by version:
+### Prerequisites
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) `>= 1.9`
+- An [HCP Terraform](https://app.terraform.io) organization and workspace
+- An Azure subscription and the [`az` CLI](https://learn.microsoft.com/cli/azure/) (for the OIDC helper script)
+- `make`
+
+### Configure
+
+1. Set your organization in `envs/dev/backend.tf`, then log in and initialize:
+
+   ```bash
+   terraform login        # once, to authenticate the CLI to HCP Terraform
+   make init
+   ```
+
+2. Copy the example variables and fill in your values (git-ignored):
+
+   ```bash
+   cp envs/dev/terraform.tfvars.example envs/dev/terraform.tfvars
+   ```
+
+Wired the workspace to Azure already? Jump to [deploy](#deploy). Otherwise run
+the [OIDC setup](#authentication-oidc) first.
+
+### Deploy
+
+```bash
+make fmt        # terraform fmt -recursive
+make validate
+make plan       # remote run in HCP Terraform
+make apply
+```
+
+Run `make` on its own to list every target:
+
+```
+Usage:
+  make <target>
+
+Targets:
+  help          Show this help
+  init          Install providers/modules and configure the backend
+  fmt           Format all Terraform files
+  fmt-check     Fail if any file is not formatted
+  validate      Validate the environment configuration
+  plan          Show the pending changes
+  apply         Apply the pending changes
+  destroy       Destroy the environment
+```
+
+## Modules and the private registry
+
+The root module consumes the shared modules from the HCP Terraform **private
+registry**, pinned by version:
 
 ```hcl
 module "network" {
-  source  = "app.terraform.io/akshay2642005/network/azurerm"
+  source  = "app.terraform.io/<org>/network/azurerm"
   version = "1.0.0"
 }
 ```
 
-This is why `make plan` works as a remote run: the modules are resolved over
-the registry instead of being uploaded from a path outside the configuration
-directory. The `modules/` directory in this repo remains the source of truth
-for those registry entries.
+This is why remote runs work: the modules are resolved over the registry instead
+of being uploaded from a path outside the configuration directory. The
+`modules/` directory in this repo remains the source of truth for those registry
+entries.
 
 To publish a new module version after changing one of the modules, bump the
 version and upload it with the helper script (the modules are published without
@@ -148,19 +265,21 @@ VCS backing, so each version is uploaded explicitly):
 
 ```bash
 export TF_TOKEN_app_terraform_io=...        # an HCP token with "Manage modules"
-scripts/publish-module.sh network 1.1.0    # network | storage | policy
+scripts/publish-module.sh network 1.1.0     # network | storage | policy
+```
 
-# point the root at the new version, then confirm it resolves
-# (edit envs/dev/main.tf -> version = "1.1.0")
+Then point the root at the new version (`envs/dev/main.tf`), re-init and plan:
+
+```bash
 terraform -chdir=envs/dev init -backend=false
 make plan
 ```
 
-### Authentication (OIDC)
+## Authentication (OIDC)
 
-The workspace authenticates to Azure with HCP Terraform dynamic credentials
-(OpenID Connect) — no stored client secret. `scripts/setup-oidc.rb` wires both
-halves: the Azure app registration + federated identity credentials and the
+The workspace authenticates to Azure with **HCP Terraform dynamic credentials
+(OpenID Connect)** — no stored client secret. `scripts/setup-oidc.rb` wires both
+halves: the Azure app registration and federated identity credentials, and the
 workspace environment variables.
 
 ```bash
@@ -198,18 +317,18 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
 
 ## Security posture
 
-- **Default deny** — all three NSGs drop all inbound and outbound traffic
-  unless a higher-priority rule allows it.
-- **Microsegmentation** — each spoke is isolated by its own deny-all NSG.
-  spoke2 reaches spoke1's workload subnet over HTTPS (443) and nothing else; a
-  third segment follows the same pattern.
+- **Default deny** — all three NSGs drop all inbound and outbound traffic unless
+  a higher-priority rule allows it.
+- **Microsegmentation** — each spoke is isolated by its own deny-all NSG. spoke2
+  reaches spoke1's workload subnet over HTTPS (`443`) and nothing else; a third
+  segment follows the same pattern.
 - **No public data plane** — the storage account has public network access
-  disabled; it is reachable only through the private endpoint, and only from
-  the peered network.
-- **Private name resolution** — `privatelink.blob.core.windows.net` is linked
-  to the spoke VNet so the storage FQDN resolves to the endpoint's private IP.
-- **Guardrail** — the enforced `deny-public-ip-on-nic` policy rejects any NIC
-  in the resource group that has a public IP, preventing drift away from the
+  disabled; it is reachable only through the private endpoint, and only from the
+  peered network.
+- **Private name resolution** — `privatelink.blob.core.windows.net` is linked to
+  the spoke VNet so the storage FQDN resolves to the endpoint's private IP.
+- **Guardrail** — the enforced `deny-public-ip-on-nic` policy rejects any NIC in
+  the resource group that has a public IP, preventing drift away from the
   private design.
 - **Guardrail scope** — the policy targets `Microsoft.Network/networkInterfaces`.
   It blocks a public IP from being *attached* to a NIC, which is what makes a
@@ -218,13 +337,48 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
   inert, and Azure evaluates the policy at NIC creation. Blocking that resource
   type outright is a deliberate non-goal here and would need a separate
   `Not allowed resource types` assignment.
+- **Secretless** — the deploying principal is an OIDC service principal; no
+  client secret is stored in the repository, the workspace, or CI.
 
-## Notes
+## Inputs
 
-- The private-endpoints subnet is intentionally left without an NSG so that
-  private-link traffic is not dropped before it reaches the endpoint.
-- The spoke2 → spoke1 HTTPS flow needs both NSG rules (egress on spoke2,
-  ingress on spoke1) and the direct spoke1↔spoke2 peering — hub-and-spoke
-  alone does not route between spokes without an NVA.
-- The storage account name must be globally unique and match
-  `^[a-z0-9]{3,24}$`; the variable validates this before any plan runs.
+| Name | Description | Default |
+|------|-------------|---------|
+| `subscription_id` | Target Azure subscription | — |
+| `location` | Azure region | `eastus` |
+| `environment` | Environment name used in tags | `dev` |
+| `storage_account_name` | Globally unique storage account name | — |
+| `hub_address_space` | Hub VNet address space | `["10.0.0.0/16"]` |
+| `spoke_address_space` | Spoke VNet address space | `["10.1.0.0/16"]` |
+| `hub_default_subnet_prefix` | Hub default subnet | `10.0.1.0/24` |
+| `spoke_workload_subnet_prefix` | Spoke workload subnet | `10.1.0.0/24` |
+| `spoke_pe_subnet_prefix` | Spoke private-endpoints subnet | `10.1.1.0/24` |
+| `spoke2_address_space` | Second spoke VNet address space | `["10.2.0.0/16"]` |
+| `spoke2_workload_subnet_prefix` | Second spoke workload subnet | `10.2.0.0/24` |
+| `allow_forwarded_traffic` | Allow forwarded traffic across peerings | `true` |
+| `tags` | Extra tags merged into the common tags | `{}` |
+
+## Outputs
+
+| Name | Description |
+|------|-------------|
+| `resource_group_name` | Resource group name |
+| `hub_vnet_id` | Hub VNet resource ID |
+| `spoke_vnet_id` | Spoke VNet resource ID |
+| `spoke2_vnet_id` | Second spoke VNet resource ID |
+| `storage_account_name` | Storage account name |
+| `storage_private_endpoint_id` | Blob private endpoint resource ID |
+| `storage_private_endpoint_ip` | Private IP allocated to the endpoint |
+| `policy_assignment_id` | Deny-public-IP-on-NIC assignment ID |
+
+## Skills demonstrated
+
+**Azure networking** · **hub-and-spoke topology** · **zero-trust and
+microsegmentation** · **NSG and Azure Policy design** · **Private Link and
+private DNS** · **Terraform module design** · **private module registry** ·
+**remote state** · **OIDC federation** · **CI/CD** · **Bash and Ruby
+automation**
+
+## License
+
+Released under the [MIT License](LICENSE).

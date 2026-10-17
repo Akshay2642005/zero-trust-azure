@@ -6,6 +6,13 @@
 2. Workloads that are private by default — no public data-plane endpoints.
 3. Guardrails that keep the environment from drifting back to public exposure.
 
+## Topology
+
+![Hub-and-spoke topology](diagrams/01-topology.svg)
+
+One hub, two spokes, one resource group. The hub carries no NVA, so spoke-to-spoke
+traffic needs its own direct peering.
+
 ## Module graph
 
 ```
@@ -42,6 +49,11 @@ rules can never drift between them.
 
 #### Microsegmentation (spoke2 → spoke1)
 
+![Microsegmentation](diagrams/02-microsegmentation.svg)
+
+*Deny-all everywhere, one allowed flow. Two coordinated rules at priority `100`
+beat the `4096` deny rules.*
+
 `spoke2` gets its own deny-all NSG plus exactly one exception: HTTPS (443) from
 its workload subnet to spoke1's workload subnet. Because Azure evaluates egress
 and ingress separately and NSG statefulness does not cross NSG boundaries, the
@@ -56,6 +68,11 @@ spokes without an NVA. Everything else stays default-deny on both spokes. This
 is the pattern to copy when adding a third workload segment.
 
 ### `modules/storage`
+
+![Private-only storage](diagrams/04-private-storage.svg)
+
+*The storage account is reachable only through its private endpoint, resolved by
+a linked private DNS zone.*
 
 Owns the private data plane. Creates the storage account, the
 `privatelink.blob.core.windows.net` private DNS zone and its VNet link, and
@@ -104,3 +121,18 @@ passed to every module; `var.tags` is merged on top.
 State lives in HCP Terraform. Local state files and saved plans are
 git-ignored; the provider dependency lock file is committed so every run
 resolves identical provider versions.
+
+## Delivery and authentication
+
+![Delivery architecture](diagrams/03-deployment.svg)
+
+*Remote runs, versioned registry modules, and an OIDC trust between HCP
+Terraform and Entra ID with no stored secrets.*
+
+Plans and applies run remotely in HCP Terraform. The environment root consumes
+the `network`, `storage` and `policy` modules from the private registry at a
+pinned version. The workspace authenticates to Azure through Microsoft Entra ID
+using OIDC federation (HCP Terraform dynamic credentials), so no long-lived
+client secret is stored in the repository or the workspace.
+`scripts/setup-oidc.rb` wires the federation; `scripts/teardown-oidc.rb`
+reverses it.
