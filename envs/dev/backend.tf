@@ -10,7 +10,7 @@
 # subscription; the remaining ARM_* values authenticate the provider.
 terraform {
   cloud {
-    organization = "YOUR-TFC-ORG"
+    organization = "akshay2642005"
 
     workspaces {
       name = "zero-trust-azure-dev"
