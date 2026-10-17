@@ -96,7 +96,9 @@ class OidcSetup
     else
       puts "Service principal exists"
     end
-    @sp_object_id = sps.dig(0, "id")
+    # Re-read the object id (a freshly created SP is not in the list above).
+    @sp_object_id = sps.dig(0, "id") ||
+                    az("ad", "sp", "show", "--id", client_id, "--query", "id", "-o", "tsv")
 
     client_id
   end
