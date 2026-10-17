@@ -22,7 +22,19 @@
 #     --subscription <sub-id> \
 #     --tenant <tenant-id> \
 #     [--project "Default Project"] [--app-name hcp-terraform-zero-trust] \
-#     [--role Contributor] [--scope /subscriptions/<sub-id>] [--dry-run]
+#     [--role "Contributor,Resource Policy Contributor"] \
+#     [--scope /subscriptions/<sub-id>] [--dry-run]
+#
+# The service principal needs two roles, and the default grants both:
+#
+#   * Contributor                — create and manage the resource group, the
+#                                  network fabric and the storage account.
+#   * Resource Policy Contributor — create the policy assignments
+#                                  (`Microsoft.Authorization/policyAssignments/write`).
+#
+# Contributor alone does NOT include Microsoft.Authorization/*, so without the
+# second role `make apply` fails with 403 AuthorizationFailed on the policy
+# assignment. Use --role (repeatable, or comma-separated) to override.
 
 require 'json'
 require 'net/http'
@@ -139,22 +151,27 @@ class OidcSetup
 
   def ensure_role_assignment
     scope = @opts[:scope] || "/subscriptions/#{@opts[:subscription]}"
+
+    @opts[:roles].each { |role| ensure_single_role(role, scope) }
+  end
+
+  def ensure_single_role(role, scope)
     assignee = @sp_object_id || 'SP_OBJECT_ID'
 
     if @dry_run
-      puts "  [dry-run] would assign #{@opts[:role]} to the service principal at #{scope}"
+      puts "  [dry-run] would assign #{role} to the service principal at #{scope}"
       return
     end
 
     existing = az_json('role', 'assignment', 'list', '--assignee', assignee, '--scope', scope) || []
-    if existing.any? { |a| a['roleDefinitionName'] == @opts[:role] }
-      puts "Role assignment exists: #{@opts[:role]} at #{scope}"
+    if existing.any? { |a| a['roleDefinitionName'] == role }
+      puts "Role assignment exists: #{role} at #{scope}"
       return
     end
 
-    az('role', 'assignment', 'create', '--assignee', assignee, '--role', @opts[:role],
+    az('role', 'assignment', 'create', '--assignee', assignee, '--role', role,
        '--scope', scope, mutate: true)
-    puts "Assigned #{@opts[:role]} at #{scope}"
+    puts "Assigned #{role} at #{scope}"
   end
 
   # --- HCP helpers ---------------------------------------------------------
@@ -298,6 +315,7 @@ class OidcSetup
       Done. Dynamic credentials are wired for:
         org/workspace : #{@opts[:org]}/#{@opts[:workspace]}
         client id     : #{client_id}
+        roles         : #{@opts[:roles].join(', ')}
         subjects      : organization:#{@opts[:org]}:project:#{project}:workspace:#{@opts[:workspace]}:run_phase:{plan,apply}
 
       Run `make plan` — the Azure CLI auth error should be gone.
@@ -311,9 +329,12 @@ options = {
   org: 'akshay2642005',
   workspace: 'zero-trust-azure-dev',
   app_name: 'hcp-terraform-zero-trust',
-  role: 'Contributor',
+  roles: ['Contributor', 'Resource Policy Contributor'],
   dry_run: false
 }
+
+# --role replaces the defaults on first use; later occurrences append.
+roles_overridden = false
 
 OptionParser.new do |o|
   o.banner = 'Usage: setup-oidc.rb [options]'
@@ -323,7 +344,14 @@ OptionParser.new do |o|
   o.on('--app-name NAME', 'Azure app registration name') { |v| options[:app_name] = v }
   o.on('--subscription ID', 'Azure subscription id') { |v| options[:subscription] = v }
   o.on('--tenant ID', 'Azure tenant id') { |v| options[:tenant] = v }
-  o.on('--role ROLE', 'Azure role to assign') { |v| options[:role] = v }
+  o.on('--role ROLE', 'Azure role(s) to assign; repeatable or comma-separated ' \
+       "(default: #{options[:roles].join(', ')})") do |v|
+    unless roles_overridden
+      options[:roles] = []
+      roles_overridden = true
+    end
+    options[:roles].concat(v.split(',').map(&:strip).reject(&:empty?))
+  end
   o.on('--scope SCOPE', 'Azure scope (default /subscriptions/<id>)') { |v| options[:scope] = v }
   o.on('--dry-run', 'Print actions without mutating anything') { options[:dry_run] = true }
   o.on('-h', '--help', 'Show this help') do
