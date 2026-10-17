@@ -169,6 +169,13 @@ scripts/setup-oidc.rb \
   --dry-run          # preview, then drop --dry-run to apply
 ```
 
+To undo it (delete the app registration and the workspace variables):
+
+```bash
+scripts/teardown-oidc.rb --dry-run   # preview
+scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
+```
+
 ## Security posture
 
 - **Default deny** — all three NSGs drop all inbound and outbound traffic
