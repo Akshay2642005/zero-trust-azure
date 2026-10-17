@@ -21,3 +21,16 @@ module "network" {
 
   tags = local.common_tags
 }
+
+module "storage" {
+  source = "../../modules/storage"
+
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  naming              = local.storage_naming
+
+  pe_subnet_id = module.network.spoke_pe_subnet_id
+  vnet_id      = module.network.spoke_vnet_id
+
+  tags = local.common_tags
+}
