@@ -12,12 +12,14 @@ module "network" {
   location            = azurerm_resource_group.this.location
   naming              = local.network_naming
 
-  hub_address_space            = var.hub_address_space
-  spoke_address_space          = var.spoke_address_space
-  hub_default_subnet_prefix    = var.hub_default_subnet_prefix
-  spoke_workload_subnet_prefix = var.spoke_workload_subnet_prefix
-  spoke_pe_subnet_prefix       = var.spoke_pe_subnet_prefix
-  allow_forwarded_traffic      = var.allow_forwarded_traffic
+  hub_address_space             = var.hub_address_space
+  spoke_address_space           = var.spoke_address_space
+  hub_default_subnet_prefix     = var.hub_default_subnet_prefix
+  spoke_workload_subnet_prefix  = var.spoke_workload_subnet_prefix
+  spoke_pe_subnet_prefix        = var.spoke_pe_subnet_prefix
+  spoke2_address_space          = var.spoke2_address_space
+  spoke2_workload_subnet_prefix = var.spoke2_workload_subnet_prefix
+  allow_forwarded_traffic       = var.allow_forwarded_traffic
 
   tags = local.common_tags
 }

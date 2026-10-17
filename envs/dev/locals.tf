@@ -4,15 +4,22 @@ locals {
 
   # Names owned by the network module.
   network_naming = {
-    hub_vnet              = "hub-vnet"
-    spoke_vnet            = "spoke-vnet"
-    hub_default_subnet    = "hub-default"
-    spoke_workload_subnet = "spoke-workload"
-    spoke_pe_subnet       = "spoke-private-endpoints"
-    hub_nsg               = "hub-nsg"
-    spoke_nsg             = "spoke-nsg"
-    hub_to_spoke_peering  = "hub-to-spoke"
-    spoke_to_hub_peering  = "spoke-to-hub"
+    hub_vnet                = "hub-vnet"
+    spoke_vnet              = "spoke-vnet"
+    spoke2_vnet             = "spoke2-vnet"
+    hub_default_subnet      = "hub-default"
+    spoke_workload_subnet   = "spoke-workload"
+    spoke_pe_subnet         = "spoke-private-endpoints"
+    spoke2_workload_subnet  = "spoke2-workload"
+    hub_nsg                 = "hub-nsg"
+    spoke_nsg               = "spoke-nsg"
+    spoke2_nsg              = "spoke2-nsg"
+    hub_to_spoke_peering    = "hub-to-spoke"
+    spoke_to_hub_peering    = "spoke-to-hub"
+    hub_to_spoke2_peering   = "hub-to-spoke2"
+    spoke2_to_hub_peering   = "spoke2-to-hub"
+    spoke_to_spoke2_peering = "spoke-to-spoke2"
+    spoke2_to_spoke_peering = "spoke2-to-spoke"
   }
 
   # Names owned by the storage module.

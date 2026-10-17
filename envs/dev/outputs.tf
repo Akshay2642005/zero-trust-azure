@@ -13,6 +13,11 @@ output "spoke_vnet_id" {
   value       = module.network.spoke_vnet_id
 }
 
+output "spoke2_vnet_id" {
+  description = "Resource ID of the second spoke virtual network."
+  value       = module.network.spoke2_vnet_id
+}
+
 output "storage_account_name" {
   description = "Name of the storage account."
   value       = module.storage.storage_account_name

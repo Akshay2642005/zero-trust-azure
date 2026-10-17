@@ -55,6 +55,18 @@ variable "spoke_pe_subnet_prefix" {
   default     = "10.1.1.0/24"
 }
 
+variable "spoke2_address_space" {
+  description = "Address space (CIDRs) for the second spoke virtual network."
+  type        = list(string)
+  default     = ["10.2.0.0/16"]
+}
+
+variable "spoke2_workload_subnet_prefix" {
+  description = "Address prefix for the second spoke workload subnet."
+  type        = string
+  default     = "10.2.0.0/24"
+}
+
 variable "allow_forwarded_traffic" {
   description = "Whether to allow forwarded traffic across the VNet peerings."
   type        = bool

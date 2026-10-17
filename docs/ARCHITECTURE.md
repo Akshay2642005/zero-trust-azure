@@ -27,13 +27,28 @@ envs/dev
 
 ### `modules/network`
 
-Owns the fabric. Creates the hub and spoke VNets, the three subnets, the
-default-deny NSGs and their subnet associations, and the bidirectional VNet
-peering. The private-endpoints subnet is deliberately left without an NSG so
-private-link traffic is not dropped before it reaches an endpoint.
+Owns the fabric. Creates the hub and two spoke VNets, the subnets, the
+default-deny NSGs and their subnet associations, and the VNet peerings. The
+private-endpoints subnet is deliberately left without an NSG so private-link
+traffic is not dropped before it reaches an endpoint.
 
-The two NSGs are generated from one `deny_all_rules` map so inbound and
-outbound rules can never drift between them.
+The NSGs are generated from one `deny_all_rules` map so inbound and outbound
+rules can never drift between them.
+
+#### Microsegmentation (spoke2 → spoke1)
+
+`spoke2` gets its own deny-all NSG plus exactly one exception: HTTPS (443) from
+its workload subnet to spoke1's workload subnet. Because Azure evaluates egress
+and ingress separately and NSG statefulness does not cross NSG boundaries, the
+single logical flow is expressed as two coordinated rules:
+
+- `AllowHttpsToSpoke1Workload` — **outbound** allow on the spoke2 NSG
+- `AllowHttpsFromSpoke2` — **inbound** allow on the spoke1 NSG
+
+The traffic also needs a route: a direct `spoke_to_spoke2` / `spoke2_to_spoke`
+peering pair, because a hub-and-spoke topology alone does not route between
+spokes without an NVA. Everything else stays default-deny on both spokes. This
+is the pattern to copy when adding a third workload segment.
 
 ### `modules/storage`
 

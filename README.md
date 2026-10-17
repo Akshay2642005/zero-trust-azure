@@ -38,7 +38,7 @@ root, so the same fabric can be deployed to any number of environments.
 
 ```
 modules/
-  network/   hub + spoke VNets, subnets, default-deny NSGs, VNet peering
+  network/   hub + two spoke VNets, subnets, default-deny NSGs, VNet peering
   storage/   private storage account, blob private endpoint, private DNS zone
   policy/    resource-group policy assignment (guardrails)
 envs/
@@ -54,12 +54,14 @@ Each module is self-contained: it declares its own inputs and outputs, takes a
 | Resource | Notes |
 |----------|-------|
 | Resource group | `zt-rg`, managed by Terraform |
-| `hub-nsg`, `spoke-nsg` | default-deny inbound **and** outbound |
+| `hub-nsg`, `spoke-nsg`, `spoke2-nsg` | default-deny inbound **and** outbound |
 | `hub-vnet` (10.0.0.0/16) | hub network |
-| `spoke-vnet` (10.1.0.0/16) | workload network |
-| `hub-default`, `spoke-workload` | subnets with the NSGs associated |
+| `spoke-vnet` (10.1.0.0/16) | first workload network |
+| `spoke2-vnet` (10.2.0.0/16) | second, isolated workload segment |
+| `hub-default`, `spoke-workload`, `spoke2-workload` | subnets with the NSGs associated |
 | `spoke-private-endpoints` | open subnet reserved for private endpoints |
-| bidirectional peering | forwarded traffic enabled |
+| bidirectional peering | hub↔each spoke, plus a direct spoke1↔spoke2 pair |
+| HTTPS allow (spoke2 → spoke1) | the one exception to default-deny: 443 to the spoke1 workload subnet |
 | `ztstorage` | StorageV2, TLS 1.2+, HTTPS-only, public access disabled |
 | `privatelink.blob.core.windows.net` | private DNS zone, linked to the spoke VNet |
 | `pe-storage-blob` | private endpoint + DNS zone group |
@@ -78,6 +80,8 @@ Each module is self-contained: it declares its own inputs and outputs, takes a
 | `hub_default_subnet_prefix` | Hub default subnet | `10.0.1.0/24` |
 | `spoke_workload_subnet_prefix` | Spoke workload subnet | `10.1.0.0/24` |
 | `spoke_pe_subnet_prefix` | Spoke private-endpoints subnet | `10.1.1.0/24` |
+| `spoke2_address_space` | Second spoke VNet address space | `["10.2.0.0/16"]` |
+| `spoke2_workload_subnet_prefix` | Second spoke workload subnet | `10.2.0.0/24` |
 | `allow_forwarded_traffic` | Allow forwarded traffic across peerings | `true` |
 | `tags` | Extra tags merged into the common tags | `{}` |
 
@@ -88,6 +92,7 @@ Each module is self-contained: it declares its own inputs and outputs, takes a
 | `resource_group_name` | Resource group name |
 | `hub_vnet_id` | Hub VNet resource ID |
 | `spoke_vnet_id` | Spoke VNet resource ID |
+| `spoke2_vnet_id` | Second spoke VNet resource ID |
 | `storage_account_name` | Storage account name |
 | `storage_private_endpoint_id` | Blob private endpoint resource ID |
 | `storage_private_endpoint_ip` | Private IP allocated to the endpoint |
@@ -117,8 +122,11 @@ Copy `envs/dev/terraform.tfvars.example` to `envs/dev/terraform.tfvars`
 
 ## Security posture
 
-- **Default deny** — both NSGs drop all inbound and outbound traffic unless a
-  higher-priority rule allows it.
+- **Default deny** — all three NSGs drop all inbound and outbound traffic
+  unless a higher-priority rule allows it.
+- **Microsegmentation** — each spoke is isolated by its own deny-all NSG.
+  spoke2 reaches spoke1's workload subnet over HTTPS (443) and nothing else; a
+  third segment follows the same pattern.
 - **No public data plane** — the storage account has public network access
   disabled; it is reachable only through the private endpoint, and only from
   the peered network.
@@ -132,5 +140,8 @@ Copy `envs/dev/terraform.tfvars.example` to `envs/dev/terraform.tfvars`
 
 - The private-endpoints subnet is intentionally left without an NSG so that
   private-link traffic is not dropped before it reaches the endpoint.
+- The spoke2 → spoke1 HTTPS flow needs both NSG rules (egress on spoke2,
+  ingress on spoke1) and the direct spoke1↔spoke2 peering — hub-and-spoke
+  alone does not route between spokes without an NVA.
 - The storage account name must be globally unique and match
   `^[a-z0-9]{3,24}$`; the variable validates this before any plan runs.
