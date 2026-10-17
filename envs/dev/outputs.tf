@@ -27,3 +27,8 @@ output "storage_private_endpoint_ip" {
   description = "Private IP address allocated to the blob private endpoint."
   value       = module.storage.private_endpoint_ip
 }
+
+output "policy_assignment_id" {
+  description = "Resource ID of the deny-public-IP-on-NIC policy assignment."
+  value       = module.deny_public_ip_on_nic.id
+}

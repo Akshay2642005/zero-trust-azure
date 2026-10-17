@@ -26,6 +26,7 @@ locals {
   }
 
   # Azure Policy built-in "Network interfaces should not have public IPs".
+  deny_public_ip_on_nic_name          = "deny-public-ip-on-nic"
   deny_public_ip_on_nic_definition_id = "/providers/Microsoft.Authorization/policyDefinitions/83a86a26-fd1f-447c-b59d-e51f44264114"
 
   # Tags applied to every resource that supports them.

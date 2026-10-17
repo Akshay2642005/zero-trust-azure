@@ -34,3 +34,15 @@ module "storage" {
 
   tags = local.common_tags
 }
+
+module "deny_public_ip_on_nic" {
+  source = "../../modules/policy"
+
+  name                 = local.deny_public_ip_on_nic_name
+  resource_group_id    = azurerm_resource_group.this.id
+  policy_definition_id = local.deny_public_ip_on_nic_definition_id
+
+  display_name = "Deny Public IPs on Network Interfaces"
+  description  = "Zero Trust: prevent network interfaces from having public IPs attached."
+  enforce      = true
+}
