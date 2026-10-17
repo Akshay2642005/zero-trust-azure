@@ -49,6 +49,11 @@ envs/
 Each module is self-contained: it declares its own inputs and outputs, takes a
 `naming` object so names live in one place, and tags everything it creates.
 
+The modules are published to the HCP Terraform **private registry** and the dev
+root consumes them by version (`app.terraform.io/akshay2642005/<name>/azurerm`),
+so it no longer reaches up to `../../modules`. Publishing a new module version
+is a separate, explicit step — see [Usage](#usage).
+
 ## What it creates
 
 | Resource | Notes |
@@ -119,6 +124,37 @@ make destroy
 
 Copy `envs/dev/terraform.tfvars.example` to `envs/dev/terraform.tfvars`
 (git-ignored) and fill in `subscription_id` and `storage_account_name`.
+
+### Modules and the private registry
+
+The root module consumes the shared modules from the HCP Terraform private
+registry, pinned by version:
+
+```hcl
+module "network" {
+  source  = "app.terraform.io/akshay2642005/network/azurerm"
+  version = "1.0.0"
+}
+```
+
+This is why `make plan` works as a remote run: the modules are resolved over
+the registry instead of being uploaded from a path outside the configuration
+directory. The `modules/` directory in this repo remains the source of truth
+for those registry entries.
+
+To publish a new module version after changing one of the modules, bump the
+version and upload it with the helper script (the modules are published without
+VCS backing, so each version is uploaded explicitly):
+
+```bash
+export TF_TOKEN_app_terraform_io=...        # an HCP token with "Manage modules"
+scripts/publish-module.sh network 1.1.0    # network | storage | policy
+
+# point the root at the new version, then confirm it resolves
+# (edit envs/dev/main.tf -> version = "1.1.0")
+terraform -chdir=envs/dev init -backend=false
+make plan
+```
 
 ## Security posture
 

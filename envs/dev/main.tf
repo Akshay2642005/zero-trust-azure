@@ -6,7 +6,8 @@ resource "azurerm_resource_group" "this" {
 }
 
 module "network" {
-  source = "../../modules/network"
+  source  = "app.terraform.io/akshay2642005/network/azurerm"
+  version = "1.0.0"
 
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
@@ -25,7 +26,8 @@ module "network" {
 }
 
 module "storage" {
-  source = "../../modules/storage"
+  source  = "app.terraform.io/akshay2642005/storage/azurerm"
+  version = "1.0.0"
 
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
@@ -38,7 +40,8 @@ module "storage" {
 }
 
 module "deny_public_ip_on_nic" {
-  source = "../../modules/policy"
+  source  = "app.terraform.io/akshay2642005/policy/azurerm"
+  version = "1.0.0"
 
   name                 = local.deny_public_ip_on_nic_name
   resource_group_id    = azurerm_resource_group.this.id
