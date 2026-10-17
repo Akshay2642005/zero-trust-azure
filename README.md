@@ -70,7 +70,7 @@ is a separate, explicit step — see [Usage](#usage).
 | `ztstorage` | StorageV2, TLS 1.2+, HTTPS-only, public access disabled |
 | `privatelink.blob.core.windows.net` | private DNS zone, linked to the spoke VNet |
 | `pe-storage-blob` | private endpoint + DNS zone group |
-| `deny-public-ip-on-nic` | Azure Policy assignment, enforced |
+| `deny-public-ip-on-nic` | Azure Policy assignment, enforced; denies NICs that have a public IP |
 
 ## Inputs
 
@@ -169,6 +169,26 @@ scripts/setup-oidc.rb \
   --dry-run          # preview, then drop --dry-run to apply
 ```
 
+The script grants the principal **two** roles at subscription scope by default:
+
+| Role | Why it is needed |
+|------|------------------|
+| `Contributor` | create and manage the resource group, the network fabric and the storage account |
+| `Resource Policy Contributor` | create the Azure Policy assignments (`Microsoft.Authorization/policyAssignments/write`) |
+
+`Contributor` deliberately excludes `Microsoft.Authorization/*`, so a principal
+holding only that role will apply the network and storage fine and then fail the
+policy assignment with:
+
+```
+403 Forbidden ... AuthorizationFailed ... does not have authorization to perform
+action 'Microsoft.Authorization/policyAssignments/write'
+```
+
+Override the set with `--role "Role A,Role B"` (repeatable, or comma-separated)
+if your design needs different rights. Role assignments can take a few minutes
+to propagate; if a fresh apply still returns 403, wait and re-run.
+
 To undo it (delete the app registration and the workspace variables):
 
 ```bash
@@ -191,6 +211,13 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
 - **Guardrail** — the enforced `deny-public-ip-on-nic` policy rejects any NIC
   in the resource group that has a public IP, preventing drift away from the
   private design.
+- **Guardrail scope** — the policy targets `Microsoft.Network/networkInterfaces`.
+  It blocks a public IP from being *attached* to a NIC, which is what makes a
+  workload publicly reachable. It does **not** block creating a standalone
+  `Microsoft.Network/publicIPAddresses` resource: an unattached public IP is
+  inert, and Azure evaluates the policy at NIC creation. Blocking that resource
+  type outright is a deliberate non-goal here and would need a separate
+  `Not allowed resource types` assignment.
 
 ## Notes
 

@@ -76,6 +76,21 @@ Takes a definition/initiative ID and an `enforce` toggle; the environment
 supplies the built-in "Network interfaces should not have public IPs"
 definition (`83a86a26-fd1f-447c-b59d-e51f44264114`).
 
+The assignment's `if` clause matches `Microsoft.Network/networkInterfaces` whose
+`ipconfigurations[*].publicIpAddress` is set. It therefore denies a public IP
+being *attached* to a NIC — the step that makes a workload publicly reachable —
+while still allowing a standalone `Microsoft.Network/publicIPAddresses` resource
+to be created (an unattached public IP is inert). Guarding the resource type
+itself is out of scope for this module; that would be a `Not allowed resource
+types` assignment.
+
+Writing a policy assignment is an Azure control-plane operation
+(`Microsoft.Authorization/policyAssignments/write`). The deploying principal is
+the HCP Terraform service principal wired by `scripts/setup-oidc.rb`, which
+grants it `Contributor` **and** `Resource Policy Contributor` at subscription
+scope for this reason: `Contributor` alone excludes `Microsoft.Authorization/*`,
+so the assignment apply fails with `403 AuthorizationFailed`.
+
 ## Naming and tagging
 
 All physical names live in `envs/dev/locals.tf`, split into a `network_naming`
