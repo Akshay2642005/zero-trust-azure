@@ -17,13 +17,13 @@
 #     --org akshay2642005 --workspace zero-trust-azure-dev \
 #     [--app-name hcp-terraform-zero-trust] [--dry-run] [--yes]
 
-require "json"
-require "net/http"
-require "open3"
-require "optparse"
-require "uri"
+require 'json'
+require 'net/http'
+require 'open3'
+require 'optparse'
+require 'uri'
 
-HCP_API = "https://app.terraform.io/api/v2"
+HCP_API = 'https://app.terraform.io/api/v2'
 # Exactly the variables setup-oidc.rb creates.
 OIDC_VARS = %w[
   TFC_AZURE_PROVIDER_AUTH
@@ -34,6 +34,8 @@ OIDC_VARS = %w[
 
 class TeardownError < StandardError; end
 
+# Reverses scripts/setup-oidc.rb: deletes the Azure app registration and the
+# HCP workspace environment variables used for dynamic credentials.
 class OidcTeardown
   def initialize(opts)
     @opts = opts
@@ -57,72 +59,72 @@ class OidcTeardown
   def az(*args, mutate: false)
     if @dry_run && mutate
       puts "  [dry-run] az #{args.join(' ')}"
-      return ""
+      return ''
     end
-    out, err, status = Open3.capture3("az", *args)
+    out, err, status = Open3.capture3('az', *args)
     raise TeardownError, "az #{args.join(' ')} failed:\n#{err.strip}" unless status.success?
 
     out.strip
   end
 
   def az_json(*args, mutate: false)
-    raw = az(*args, "-o", "json", mutate: mutate)
+    raw = az(*args, '-o', 'json', mutate: mutate)
     raw.nil? || raw.empty? ? [] : JSON.parse(raw)
   end
 
   def remove_azure
     if @dry_run
       puts "  [dry-run] would delete app registration #{@opts[:app_name].inspect} (if present)"
-      puts "  [dry-run] would delete its service principal and role assignments"
+      puts '  [dry-run] would delete its service principal and role assignments'
       return
     end
 
     app = find_app
     return puts("No app registration named #{@opts[:app_name].inspect} — nothing to remove in Azure.") unless app
 
-    app_id = app["appId"]
+    app_id = app['appId']
     puts "App registration: #{@opts[:app_name]} (#{app_id})"
 
     sp = find_service_principal(app_id)
     if sp
-      object_id = sp["id"]
+      object_id = sp['id']
       delete_role_assignments(object_id)
-      az("ad", "sp", "delete", "--id", object_id, mutate: true)
-      puts "  deleted service principal"
+      az('ad', 'sp', 'delete', '--id', object_id, mutate: true)
+      puts '  deleted service principal'
     else
-      puts "  no service principal found"
+      puts '  no service principal found'
     end
 
-    az("ad", "app", "delete", "--id", app_id, mutate: true)
-    puts "  deleted app registration"
+    az('ad', 'app', 'delete', '--id', app_id, mutate: true)
+    puts '  deleted app registration'
   end
 
   def find_app
     return nil if @dry_run
 
-    apps = az_json("ad", "app", "list", "--display-name", @opts[:app_name])
-    apps.find { |a| a["displayName"] == @opts[:app_name] }
+    apps = az_json('ad', 'app', 'list', '--display-name', @opts[:app_name])
+    apps.find { |a| a['displayName'] == @opts[:app_name] }
   end
 
   def find_service_principal(app_id)
     return nil if @dry_run
 
-    sps = az_json("ad", "sp", "list", "--filter", "appId eq '#{app_id}'", "--all")
+    sps = az_json('ad', 'sp', 'list', '--filter', "appId eq '#{app_id}'", '--all')
     sps.first
   end
 
   def delete_role_assignments(object_id)
-    assignments = az_json("role", "assignment", "list", "--assignee", object_id, "--all") || []
+    assignments = az_json('role', 'assignment', 'list', '--assignee', object_id, '--all') || []
     if assignments.empty?
-      puts "  no role assignments"
+      puts '  no role assignments'
       return
     end
     assignments.each do |a|
-      scope = a["scope"]
-      role = a["roleDefinitionName"]
+      scope = a['scope']
+      role = a['roleDefinitionName']
       puts "  removing role #{role} at #{scope}"
-      az("role", "assignment", "delete", "--assignee", object_id, "--role", role,
-         "--scope", scope, mutate: true)
+      az('role', 'assignment', 'delete', '--assignee', object_id, '--role', role,
+         '--scope', scope, mutate: true)
     end
   end
 
@@ -134,7 +136,7 @@ class OidcTeardown
     present = OIDC_VARS & index.keys
 
     if present.empty?
-      puts "No OIDC workspace variables to remove."
+      puts 'No OIDC workspace variables to remove.'
       return
     end
 
@@ -145,18 +147,18 @@ class OidcTeardown
   end
 
   def workspace_id
-    return "<WORKSPACE_ID>" if @dry_run
+    return '<WORKSPACE_ID>' if @dry_run
 
     data = hcp(:get, "organizations/#{@opts[:org]}/workspaces/#{@opts[:workspace]}")
-    data.dig("data", "id") or raise TeardownError, "workspace #{@opts[:workspace]} not found"
+    data.dig('data', 'id') or raise TeardownError, "workspace #{@opts[:workspace]} not found"
   end
 
   def variable_index(ws_id)
-    return OIDC_VARS.to_h { |k| [k, "<VAR_ID>"] } if @dry_run
+    return OIDC_VARS.to_h { |k| [k, '<VAR_ID>'] } if @dry_run
 
     data = hcp(:get, "workspaces/#{ws_id}/vars")
-    data["data"].each_with_object({}) do |v, acc|
-      acc[v.dig("attributes", "key")] = v["id"]
+    data['data'].each_with_object({}) do |v, acc|
+      acc[v.dig('attributes', 'key')] = v['id']
     end
   end
 
@@ -174,8 +176,8 @@ class OidcTeardown
       else raise TeardownError, "unsupported method #{method}"
       end
 
-    request["Authorization"] = "Bearer #{token}"
-    request["Content-Type"]  = "application/vnd.api+json"
+    request['Authorization'] = "Bearer #{token}"
+    request['Content-Type']  = 'application/vnd.api+json'
     request.body = JSON.generate(body) if body
 
     response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }
@@ -189,17 +191,17 @@ class OidcTeardown
   # --- misc ----------------------------------------------------------------
 
   def preflight!
-    unless @dry_run
-      system("az", "--version", out: File::NULL, err: File::NULL) ||
-        raise(TeardownError, "missing required executable: az (install the Azure CLI and run `az login`)")
-    end
+    return if @dry_run
+
+    system('az', '--version', out: File::NULL, err: File::NULL) ||
+      raise(TeardownError, 'missing required executable: az (install the Azure CLI and run `az login`)')
   end
 
   def confirm!
     puts "This will DELETE the app registration #{@opts[:app_name].inspect} and the OIDC"
     puts "workspace variables in #{@opts[:org]}/#{@opts[:workspace]}."
     print "Type 'yes' to continue: "
-    raise TeardownError, "aborted" unless $stdin.gets.to_s.strip == "yes"
+    raise TeardownError, 'aborted' unless $stdin.gets.to_s.strip == 'yes'
   end
 
   def token
@@ -207,13 +209,13 @@ class OidcTeardown
   end
 
   def load_token
-    env = ENV["TF_TOKEN_app_terraform_io"]
+    env = ENV['TF_TOKEN_app_terraform_io']
     return env if env && !env.empty?
 
-    path = File.expand_path("~/.terraform.d/credentials.tfrc.json")
+    path = File.expand_path('~/.terraform.d/credentials.tfrc.json')
     raise TeardownError, "no HCP token: set TF_TOKEN_app_terraform_io or create #{path}" unless File.exist?(path)
 
-    parsed = JSON.parse(File.read(path)).dig("credentials", "app.terraform.io", "token")
+    parsed = JSON.parse(File.read(path)).dig('credentials', 'app.terraform.io', 'token')
     raise TeardownError, "no app.terraform.io token in #{path}" unless parsed
 
     parsed
@@ -221,21 +223,24 @@ class OidcTeardown
 end
 
 options = {
-  org: "akshay2642005",
-  workspace: "zero-trust-azure-dev",
-  app_name: "hcp-terraform-zero-trust",
+  org: 'akshay2642005',
+  workspace: 'zero-trust-azure-dev',
+  app_name: 'hcp-terraform-zero-trust',
   dry_run: false,
-  yes: false,
+  yes: false
 }
 
 OptionParser.new do |o|
-  o.banner = "Usage: teardown-oidc.rb [options]"
-  o.on("--org ORG", "HCP Terraform organization") { |v| options[:org] = v }
-  o.on("--workspace NAME", "HCP Terraform workspace") { |v| options[:workspace] = v }
-  o.on("--app-name NAME", "Azure app registration name") { |v| options[:app_name] = v }
-  o.on("--dry-run", "Print actions without deleting anything") { options[:dry_run] = true }
-  o.on("--yes", "Skip the confirmation prompt") { options[:yes] = true }
-  o.on("-h", "--help", "Show this help") { puts o; exit }
+  o.banner = 'Usage: teardown-oidc.rb [options]'
+  o.on('--org ORG', 'HCP Terraform organization') { |v| options[:org] = v }
+  o.on('--workspace NAME', 'HCP Terraform workspace') { |v| options[:workspace] = v }
+  o.on('--app-name NAME', 'Azure app registration name') { |v| options[:app_name] = v }
+  o.on('--dry-run', 'Print actions without deleting anything') { options[:dry_run] = true }
+  o.on('--yes', 'Skip the confirmation prompt') { options[:yes] = true }
+  o.on('-h', '--help', 'Show this help') do
+    puts o
+    exit
+  end
 end.parse!
 
 begin

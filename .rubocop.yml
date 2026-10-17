@@ -1,0 +1,25 @@
+# RuboCop configuration for the Ruby automation in scripts/.
+#
+# These are standalone CLI scripts rather than a library, so the strict
+# default metrics (10-line methods, 100-line classes) do not fit. Everything
+# else stays on the RuboCop defaults.
+AllCops:
+  TargetRubyVersion: 3.1
+  NewCops: disable
+  SuggestExtensions: false
+
+Metrics/ClassLength:
+  Max: 250
+
+Metrics/MethodLength:
+  Max: 30
+
+Metrics/AbcSize:
+  Max: 35
+
+Metrics/CyclomaticComplexity:
+  Max: 12
+
+Metrics/BlockLength:
+  Exclude:
+    - 'scripts/**/*'

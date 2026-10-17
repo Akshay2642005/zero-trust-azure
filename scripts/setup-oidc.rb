@@ -24,21 +24,23 @@
 #     [--project "Default Project"] [--app-name hcp-terraform-zero-trust] \
 #     [--role Contributor] [--scope /subscriptions/<sub-id>] [--dry-run]
 
-require "json"
-require "net/http"
-require "open3"
-require "optparse"
-require "uri"
+require 'json'
+require 'net/http'
+require 'open3'
+require 'optparse'
+require 'uri'
 
-HCP_API   = "https://app.terraform.io/api/v2"
-ISSUER    = "https://app.terraform.io"
-AUDIENCE  = "api://AzureADTokenExchange"
+HCP_API   = 'https://app.terraform.io/api/v2'
+ISSUER    = 'https://app.terraform.io'
+AUDIENCE  = 'api://AzureADTokenExchange'
 PHASES    = %w[plan apply].freeze
 # Variables that would force static-secret auth and defeat dynamic credentials.
 FORBIDDEN = %w[ARM_CLIENT_ID ARM_CLIENT_SECRET ARM_USE_OIDC ARM_OIDC_TOKEN].freeze
 
 class SetupError < StandardError; end
 
+# Wires HCP Terraform dynamic credentials to Azure by configuring the Azure app
+# registration + federated credentials and the workspace environment variables.
 class OidcSetup
   def initialize(opts)
     @opts = opts
@@ -61,44 +63,44 @@ class OidcSetup
   def az(*args, mutate: false)
     if @dry_run && mutate
       puts "  [dry-run] az #{args.join(' ')}"
-      return "{}"
+      return '{}'
     end
-    out, err, status = Open3.capture3("az", *args)
+    out, err, status = Open3.capture3('az', *args)
     raise SetupError, "az #{args.join(' ')} failed:\n#{err.strip}" unless status.success?
 
     out.strip
   end
 
   def az_json(*args, mutate: false)
-    raw = az(*args, "-o", "json", mutate: mutate)
+    raw = az(*args, '-o', 'json', mutate: mutate)
     raw.nil? || raw.empty? ? [] : JSON.parse(raw)
   end
 
   def ensure_app
-    return "<CLIENT_ID>" if @dry_run
+    return '<CLIENT_ID>' if @dry_run
 
-    existing = az_json("ad", "app", "list", "--display-name", @opts[:app_name])
-    app = existing.find { |a| a["displayName"] == @opts[:app_name] }
+    existing = az_json('ad', 'app', 'list', '--display-name', @opts[:app_name])
+    app = existing.find { |a| a['displayName'] == @opts[:app_name] }
 
     if app
       puts "App registration exists: #{app['displayName']} (#{app['appId']})"
     else
-      app = az_json("ad", "app", "create", "--display-name", @opts[:app_name], mutate: true)
+      app = az_json('ad', 'app', 'create', '--display-name', @opts[:app_name], mutate: true)
       puts "Created app registration: #{@opts[:app_name]} (#{app['appId']})"
     end
 
-    client_id = app["appId"]
+    client_id = app['appId']
 
-    sps = az_json("ad", "sp", "list", "--filter", "appId eq '#{client_id}'", "--all")
+    sps = az_json('ad', 'sp', 'list', '--filter', "appId eq '#{client_id}'", '--all')
     if sps.empty?
-      az("ad", "sp", "create", "--id", client_id, mutate: true)
-      puts "Created service principal"
+      az('ad', 'sp', 'create', '--id', client_id, mutate: true)
+      puts 'Created service principal'
     else
-      puts "Service principal exists"
+      puts 'Service principal exists'
     end
     # Re-read the object id (a freshly created SP is not in the list above).
-    @sp_object_id = sps.dig(0, "id") ||
-                    az("ad", "sp", "show", "--id", client_id, "--query", "id", "-o", "tsv")
+    @sp_object_id = sps.dig(0, 'id') ||
+                    az('ad', 'sp', 'show', '--id', client_id, '--query', 'id', '-o', 'tsv')
 
     client_id
   end
@@ -106,8 +108,8 @@ class OidcSetup
   def ensure_federated_credentials(client_id)
     return if @dry_run
 
-    existing = az_json("ad", "app", "federated-credential", "list", "--id", client_id)
-    names = existing.map { |c| c["name"] }
+    existing = az_json('ad', 'app', 'federated-credential', 'list', '--id', client_id)
+    names = existing.map { |c| c['name'] }
 
     PHASES.each do |phase|
       name = "tfc-#{phase}"
@@ -115,8 +117,8 @@ class OidcSetup
         puts "Federated credential exists: #{name}"
         next
       end
-      az("ad", "app", "federated-credential", "create", "--id", client_id,
-         "--parameters", federated_params(name, phase), mutate: true)
+      az('ad', 'app', 'federated-credential', 'create', '--id', client_id,
+         '--parameters', federated_params(name, phase), mutate: true)
       puts "Created federated credential: #{name}"
     end
   end
@@ -127,7 +129,7 @@ class OidcSetup
       issuer: ISSUER,
       subject: subject_for(phase),
       audiences: [AUDIENCE],
-      description: "HCP Terraform dynamic credentials (#{phase})",
+      description: "HCP Terraform dynamic credentials (#{phase})"
     )
   end
 
@@ -137,21 +139,21 @@ class OidcSetup
 
   def ensure_role_assignment
     scope = @opts[:scope] || "/subscriptions/#{@opts[:subscription]}"
-    assignee = @sp_object_id || "SP_OBJECT_ID"
+    assignee = @sp_object_id || 'SP_OBJECT_ID'
 
     if @dry_run
       puts "  [dry-run] would assign #{@opts[:role]} to the service principal at #{scope}"
       return
     end
 
-    existing = az_json("role", "assignment", "list", "--assignee", assignee, "--scope", scope) || []
-    if existing.any? { |a| a["roleDefinitionName"] == @opts[:role] }
+    existing = az_json('role', 'assignment', 'list', '--assignee', assignee, '--scope', scope) || []
+    if existing.any? { |a| a['roleDefinitionName'] == @opts[:role] }
       puts "Role assignment exists: #{@opts[:role]} at #{scope}"
       return
     end
 
-    az("role", "assignment", "create", "--assignee", assignee, "--role", @opts[:role],
-       "--scope", scope, mutate: true)
+    az('role', 'assignment', 'create', '--assignee', assignee, '--role', @opts[:role],
+       '--scope', scope, mutate: true)
     puts "Assigned #{@opts[:role]} at #{scope}"
   end
 
@@ -164,10 +166,10 @@ class OidcSetup
     index = variable_index(ws_id)
 
     desired = {
-      "TFC_AZURE_PROVIDER_AUTH" => "true",
-      "TFC_AZURE_RUN_CLIENT_ID" => client_id,
-      "ARM_TENANT_ID"           => @opts[:tenant],
-      "ARM_SUBSCRIPTION_ID"     => @opts[:subscription],
+      'TFC_AZURE_PROVIDER_AUTH' => 'true',
+      'TFC_AZURE_RUN_CLIENT_ID' => client_id,
+      'ARM_TENANT_ID' => @opts[:tenant],
+      'ARM_SUBSCRIPTION_ID' => @opts[:subscription]
     }
 
     desired.each do |key, value|
@@ -187,32 +189,32 @@ class OidcSetup
   end
 
   def workspace_id
-    return "<WORKSPACE_ID>" if @dry_run
+    return '<WORKSPACE_ID>' if @dry_run
 
     data = hcp(:get, "organizations/#{@opts[:org]}/workspaces/#{@opts[:workspace]}")
-    data.dig("data", "id") or raise SetupError, "workspace #{@opts[:workspace]} not found"
+    data.dig('data', 'id') or raise SetupError, "workspace #{@opts[:workspace]} not found"
   end
 
   def variable_index(ws_id)
     return {} if @dry_run
 
     data = hcp(:get, "workspaces/#{ws_id}/vars")
-    data["data"].each_with_object({}) do |v, acc|
-      acc[v.dig("attributes", "key")] = v["id"]
+    data['data'].each_with_object({}) do |v, acc|
+      acc[v.dig('attributes', 'key')] = v['id']
     end
   end
 
   def var_payload(key, value)
     {
       data: {
-        type: "vars",
+        type: 'vars',
         attributes: {
           key: key,
           value: value,
-          category: "env",
-          sensitive: false,
-        },
-      },
+          category: 'env',
+          sensitive: false
+        }
+      }
     }
   end
 
@@ -232,8 +234,8 @@ class OidcSetup
       else raise SetupError, "unsupported method #{method}"
       end
 
-    request["Authorization"] = "Bearer #{token}"
-    request["Content-Type"]  = "application/vnd.api+json"
+    request['Authorization'] = "Bearer #{token}"
+    request['Content-Type']  = 'application/vnd.api+json'
     request.body = JSON.generate(body) if body
 
     response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(request) }
@@ -249,7 +251,7 @@ class OidcSetup
       if @opts[:project]
         @opts[:project]
       elsif @dry_run
-        "Default Project"
+        'Default Project'
       else
         detect_project
       end
@@ -257,20 +259,20 @@ class OidcSetup
 
   def detect_project
     data = hcp(:get, "organizations/#{@opts[:org]}/workspaces/#{@opts[:workspace]}?include=project")
-    name = (data["included"] || []).find { |i| i["type"] == "projects" }&.dig("attributes", "name")
+    name = (data['included'] || []).find { |i| i['type'] == 'projects' }&.dig('attributes', 'name')
     puts "Detected workspace project: #{name.inspect}"
-    name || "Default Project"
+    name || 'Default Project'
   end
 
   # --- misc ----------------------------------------------------------------
 
   def preflight!
     unless @dry_run
-      system("az", "--version", out: File::NULL, err: File::NULL) ||
-        raise(SetupError, "missing required executable: az (install the Azure CLI and run `az login`)")
+      system('az', '--version', out: File::NULL, err: File::NULL) ||
+        raise(SetupError, 'missing required executable: az (install the Azure CLI and run `az login`)')
     end
-    raise SetupError, "--subscription is required" if @opts[:subscription].to_s.empty?
-    raise SetupError, "--tenant is required" if @opts[:tenant].to_s.empty?
+    raise SetupError, '--subscription is required' if @opts[:subscription].to_s.empty?
+    raise SetupError, '--tenant is required' if @opts[:tenant].to_s.empty?
   end
 
   def token
@@ -278,13 +280,13 @@ class OidcSetup
   end
 
   def load_token
-    env = ENV["TF_TOKEN_app_terraform_io"]
+    env = ENV['TF_TOKEN_app_terraform_io']
     return env if env && !env.empty?
 
-    path = File.expand_path("~/.terraform.d/credentials.tfrc.json")
+    path = File.expand_path('~/.terraform.d/credentials.tfrc.json')
     raise SetupError, "no HCP token: set TF_TOKEN_app_terraform_io or create #{path}" unless File.exist?(path)
 
-    parsed = JSON.parse(File.read(path)).dig("credentials", "app.terraform.io", "token")
+    parsed = JSON.parse(File.read(path)).dig('credentials', 'app.terraform.io', 'token')
     raise SetupError, "no app.terraform.io token in #{path}" unless parsed
 
     parsed
@@ -306,25 +308,28 @@ class OidcSetup
 end
 
 options = {
-  org: "akshay2642005",
-  workspace: "zero-trust-azure-dev",
-  app_name: "hcp-terraform-zero-trust",
-  role: "Contributor",
-  dry_run: false,
+  org: 'akshay2642005',
+  workspace: 'zero-trust-azure-dev',
+  app_name: 'hcp-terraform-zero-trust',
+  role: 'Contributor',
+  dry_run: false
 }
 
 OptionParser.new do |o|
-  o.banner = "Usage: setup-oidc.rb [options]"
-  o.on("--org ORG", "HCP Terraform organization") { |v| options[:org] = v }
-  o.on("--workspace NAME", "HCP Terraform workspace") { |v| options[:workspace] = v }
-  o.on("--project NAME", "HCP project name (auto-detected if omitted)") { |v| options[:project] = v }
-  o.on("--app-name NAME", "Azure app registration name") { |v| options[:app_name] = v }
-  o.on("--subscription ID", "Azure subscription id") { |v| options[:subscription] = v }
-  o.on("--tenant ID", "Azure tenant id") { |v| options[:tenant] = v }
-  o.on("--role ROLE", "Azure role to assign") { |v| options[:role] = v }
-  o.on("--scope SCOPE", "Azure scope (default /subscriptions/<id>)") { |v| options[:scope] = v }
-  o.on("--dry-run", "Print actions without mutating anything") { options[:dry_run] = true }
-  o.on("-h", "--help", "Show this help") { puts o; exit }
+  o.banner = 'Usage: setup-oidc.rb [options]'
+  o.on('--org ORG', 'HCP Terraform organization') { |v| options[:org] = v }
+  o.on('--workspace NAME', 'HCP Terraform workspace') { |v| options[:workspace] = v }
+  o.on('--project NAME', 'HCP project name (auto-detected if omitted)') { |v| options[:project] = v }
+  o.on('--app-name NAME', 'Azure app registration name') { |v| options[:app_name] = v }
+  o.on('--subscription ID', 'Azure subscription id') { |v| options[:subscription] = v }
+  o.on('--tenant ID', 'Azure tenant id') { |v| options[:tenant] = v }
+  o.on('--role ROLE', 'Azure role to assign') { |v| options[:role] = v }
+  o.on('--scope SCOPE', 'Azure scope (default /subscriptions/<id>)') { |v| options[:scope] = v }
+  o.on('--dry-run', 'Print actions without mutating anything') { options[:dry_run] = true }
+  o.on('-h', '--help', 'Show this help') do
+    puts o
+    exit
+  end
 end.parse!
 
 begin
