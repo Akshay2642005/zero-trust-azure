@@ -156,6 +156,19 @@ terraform -chdir=envs/dev init -backend=false
 make plan
 ```
 
+### Authentication (OIDC)
+
+The workspace authenticates to Azure with HCP Terraform dynamic credentials
+(OpenID Connect) — no stored client secret. `scripts/setup-oidc.rb` wires both
+halves: the Azure app registration + federated identity credentials and the
+workspace environment variables.
+
+```bash
+scripts/setup-oidc.rb \
+  --subscription <sub-id> --tenant <tenant-id> \
+  --dry-run          # preview, then drop --dry-run to apply
+```
+
 ## Security posture
 
 - **Default deny** — all three NSGs drop all inbound and outbound traffic
