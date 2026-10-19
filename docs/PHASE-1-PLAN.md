@@ -529,8 +529,8 @@ The release workflow then:
 
 | Risk / decision | Impact | Mitigation / recommendation |
 |---|---|---|
-| Phase 0 docs are missing | Roadmap status stays inconsistent; Phase 1 evidence has no home | Close the Phase 0 docs slice first (recommended), or create `docs/evidence/` now and defer the rest |
-| Registry release ordering | A single PR cannot consume a version that does not exist yet | One human PR uses the already-released policy module; the only post-merge step is the automated pin-bump PR from WS6 |
+| Registry release ordering | A single PR cannot consume a version that does not exist yet | One human PR uses a local source for the policy module; the automated release PR pins all modules to the registry |
+| Policy local-source bridge | The human PR plans the local module, not the registry artifact | The release tag points at the same merge commit; the generated PR switches to `policy-v1.1.0` and its plan is a no-op |
 | Custom policy JSON is only validated at apply time | A wrong alias could leave the guardrail silently ineffective | Apply in `zt-rg`, run the throwaway `Internet:22` NSG test, inspect `az policy state` |
 | Tag policies use `enforce = false` | They will not deny until enabled | Intentional staged rollout; documented; flip after the backlog is tagged |
 | HCP plan job needs a token and a CLI-driven workspace | Plan job may not run on first attempt | Confirm workspace mode first; fall back to VCS speculative plans |
@@ -541,14 +541,15 @@ The release workflow then:
 
 ### Decisions
 
-1. **Phase 0:** decided — close the missing docs first (about 4–6 h).
+1. **Phase 0:** done — see PR #1 (threat model, ADRs, evidence folder, README exceptions/trade-offs).
 2. **HCP speculative plan:** see §2.5. Recommended: API-driven GitHub job with
    `TF_API_TOKEN`. If the workspace is already VCS-connected, use VCS speculative
    plans instead.
 3. **Release flow:** decided — one human PR, then the `v1.1.0` release workflow
-   detects changed modules, tags them, and opens the automated pin-bump PR. This is
-   the closest safe equivalent to "one PR". Tagging an approved PR head is the only
-   true one-PR alternative and is not recommended.
+   detects changed modules, tags them, and opens the automated release PR (pin bumps
+   plus the policy source switch). This is the closest safe equivalent to "one PR".
+   Tagging an approved PR head is the only true one-PR alternative and is not
+   recommended.
 
 ---
 
@@ -556,7 +557,7 @@ The release workflow then:
 
 | Workstream | Estimate |
 |---|---|
-| Phase 0 docs (optional, recommended) | 4–6 h |
+| Phase 0 docs | done |
 | WS1 network tests + guard | 3–4 h |
 | WS2 storage tests | 1 h |
 | WS3 policy `parameters` + assignments + custom definition + test | 3–4 h |
