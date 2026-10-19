@@ -25,8 +25,9 @@ envs/dev
 
 The three modules are consumed from the HCP Terraform private registry
 (`app.terraform.io/akshay2642005/<name>/azurerm`), pinned by version. The
-`modules/` directory holds their source and is published to the registry;
-the environment root no longer references it by relative path.
+`modules/` directory holds their source and is published to the registry from
+this repository's git tags; the environment root no longer references it by
+relative path.
 
 `module.storage` depends on `module.network` for two inputs:
 

@@ -198,7 +198,6 @@ each stage — is in [`docs/WRITEUP.md`](docs/WRITEUP.md).
 │   └── dev/        the dev environment root: providers, backend, variables,
 │                   locals (naming + tags), module wiring and outputs
 ├── scripts/
-│   ├── publish-module.sh    publish a module version to the private registry
 │   ├── setup-oidc.rb        wire HCP Terraform ↔ Azure OIDC federation
 │   └── teardown-oidc.rb     reverse the OIDC setup
 ├── docs/
@@ -283,13 +282,21 @@ of being uploaded from a path outside the configuration directory. The
 `modules/` directory in this repo remains the source of truth for those registry
 entries.
 
-To publish a new module version after changing one of the modules, bump the
-version and upload it with the helper script (the modules are published without
-VCS backing, so each version is uploaded explicitly):
+The registry entries are **VCS-backed**: each module is connected to this GitHub
+repository, scoped to its own source directory and git tag prefix. Pushing a
+matching tag publishes that version automatically — there is no upload step.
+
+| Module | Source directory | Tag prefix | Release tag |
+|---|---|---|---|
+| `network` | `modules/network` | `network-` | `network-vX.Y.Z` |
+| `storage` | `modules/storage` | `storage-` | `storage-vX.Y.Z` |
+| `policy` | `modules/policy` | `policy-` | `policy-vX.Y.Z` |
+
+To release a new module version, push its tag:
 
 ```bash
-export TF_TOKEN_app_terraform_io=...        # an HCP token with "Manage modules"
-scripts/publish-module.sh network 1.1.0     # network | storage | policy
+git tag network-v1.1.0                      # or storage-* / policy-*
+git push origin network-v1.1.0
 ```
 
 Then point the root at the new version (`envs/dev/main.tf`), re-init and plan:

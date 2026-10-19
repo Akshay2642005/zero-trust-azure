@@ -71,7 +71,7 @@ This spec defines the work to close those gaps so the project demonstrates **bui
 | Routing | Hub<->spoke, hub<->spoke2 peerings plus a **direct spoke<->spoke2 peering** (no NVA, so no central inspection) |
 | Storage | StorageV2, TLS 1.2, public network access off, nested public off, blob soft delete, **private endpoint + `privatelink.blob.core.windows.net` zone linked to spoke VNet only** |
 | Policy | One assignment: built-in "network interfaces should not have public IPs" at resource-group scope |
-| Delivery | HCP Terraform + OIDC (`scripts/setup-oidc.rb`), modules published to the private registry (`scripts/publish-module.sh`), `Makefile` wrappers |
+| Delivery | HCP Terraform + OIDC (`scripts/setup-oidc.rb`), modules published to the private registry from the GitHub repo (tag-driven), `Makefile` wrappers |
 | Missing | CI, tests, scanning, compute, identity layer, Key Vault, logging, egress control, threat model |
 
 ## 6. Target architecture
@@ -330,7 +330,8 @@ Guardrails: all costly components behind flags (6.3); `make up` / `make down` ta
 ## 11. Module versioning and release
 
 - Semver. v1.1.0 for the three existing modules (additive, defaults keep current behavior); v0.1.0 for new modules.
-- Publish with `scripts/publish-module.sh`, then bump the `version` pins in `envs/dev/main.tf`. Never reference a module by relative path from `envs/dev`.
+- The registry is VCS-backed: each module is linked to this GitHub repo, scoped by source directory and tag prefix (`network-`, `storage-`, `policy-`). Release by pushing a tag — `git tag network-v1.0.0 && git push origin network-v1.0.0` — then bump the `version` pins in `envs/dev/main.tf`. Never reference a module by relative path from `envs/dev`.
+- Project phase tags (`vX.Y.Z`) are distinct from module tags (`<module>-vX.Y.Z`); the registry ignores tags that match no module prefix.
 - A module change and its `.tftest.hcl` land in the same PR.
 - Tag releases `vX.Y.Z` per phase completion; the GitHub release notes become the changelog.
 

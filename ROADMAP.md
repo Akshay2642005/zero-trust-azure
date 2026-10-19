@@ -84,7 +84,7 @@ Checklist
 - [ ] HCP speculative plan on PR (or document the manual alternative)
 - [ ] `.pre-commit-config.yaml` with terraform-docs; `make hooks`
 - [ ] Extra policies in `module.policy` (look up built-in IDs with `az policy definition list`; custom definition for "no inbound 22/3389 from *"); start tag policy as Audit
-- [ ] Publish modules v1.1.0 (`scripts/publish-module.sh`), bump pins in `envs/dev/main.tf`
+- [x] Modules published from the VCS-backed private registry at v1.0.0 — releases are git tags (`network-vX.Y.Z`, `storage-vX.Y.Z`, `policy-vX.Y.Z`)
 - [ ] Branch protection requiring CI (screenshot)
 
 Evidence: screenshot of a deliberately bad PR failing CI.
