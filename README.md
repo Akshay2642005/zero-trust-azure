@@ -56,6 +56,8 @@ every exception is explicit, reviewed and visible in one place.
 - [Modules and the private registry](#modules-and-the-private-registry)
 - [Authentication (OIDC)](#authentication-oidc)
 - [Security posture](#security-posture)
+- [Accepted exceptions](#accepted-exceptions)
+- [Known trade-offs](#known-trade-offs)
 - [Inputs](#inputs)
 - [Outputs](#outputs)
 - [Skills demonstrated](#skills-demonstrated)
@@ -202,7 +204,11 @@ each stage — is in [`docs/WRITEUP.md`](docs/WRITEUP.md).
 │   └── teardown-oidc.rb     reverse the OIDC setup
 ├── docs/
 │   ├── ARCHITECTURE.md      technical reference: topology, modules, state
+│   ├── THREAT-MODEL.md      threats, controls, residual risks, verification
+│   ├── PHASE-1-PLAN.md      implementation plan for automation and guardrails
 │   ├── WRITEUP.md           step-by-step build journal (the NextWork project)
+│   ├── adr/                 architecture decision records and the ADR template
+│   ├── evidence/            screenshots and command output per phase
 │   ├── cover.png            project cover image
 │   └── diagrams/            Excalidraw-exported architecture diagrams (SVG)
 ├── Makefile
@@ -370,6 +376,46 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
   `Not allowed resource types` assignment.
 - **Secretless** — the deploying principal is an OIDC service principal; no
   client secret is stored in the repository, the workspace, or CI.
+
+The full threat model, including residual risks and what is deliberately out of
+scope, is in [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md). Decisions are recorded
+in [`docs/adr/`](docs/adr/).
+
+## Accepted exceptions
+
+Default-deny is the baseline. Every allowed flow is an exception and must appear in
+this table, mirroring the flow register in [`SPEC.md` §6.4](SPEC.md). Rows marked
+**Planned** are not configured yet; they land in the phase shown.
+
+| ID | Source | Destination | Port | Path | Status |
+|---|---|---|---|---|---|
+| F1 | `spoke2-workload` | `spoke-workload` | 443 | direct VNet peering | **Active** (baseline) |
+| F2 | `hub-access` (connector) | `spoke-workload` | 22, 443 | peering | Planned — Phase 3 |
+| F3 | `hub-access` (connector) | storage private endpoint | 443 | peering + private DNS | Planned — Phase 3 |
+| F4 | `hub-access` (connector) | Key Vault private endpoint | 443 | peering + private DNS | Planned — Phase 4 |
+| F5 | `hub-access` (connector) | Twingate cloud | 443 | NAT Gateway (Phase 2) → Firewall FQDN rules (Phase 6) | Planned — Phase 2 |
+| F6 | `spoke` VM 1 | storage private endpoint | 443 | managed identity + RBAC | Planned — Phase 4 |
+| F7 | platform | VMs (guest agent, run-command) | n/a | Azure platform address, not NSG-controlled | Planned — Phase 4 (verify) |
+
+Everything not in this table is denied by the `DenyAllInbound` and
+`DenyAllOutbound` rules at priority 4096. Adding a row is a security change: update
+this table, the flow register, and the test in the same PR.
+
+Non-flow exceptions (things that are not a source/destination pair) are in
+[Known trade-offs](#known-trade-offs).
+
+## Known trade-offs
+
+These are deliberate weaknesses, accepted for the lab and tracked in the roadmap.
+Each has an exit condition; until then it is a documented risk, not an oversight.
+
+| Trade-off | Why it exists | Risk | Exit |
+|---|---|---|---|
+| Private-endpoints subnet has no NSG | Private Link traffic can be dropped before it reaches the endpoint; the subnet only hosts endpoints | No subnet-level microsegmentation there | Revisit if the subnet hosts anything else; add a narrow NSG |
+| Direct spoke-to-spoke peering | The hub has no NVA; peering is the only path for F1 | F1 bypasses a central inspection point | Phase 6: firewall path, then `enable_direct_spoke_peering = false` ([ADR-002](docs/adr/ADR-002-direct-spoke-peering.md)) |
+| Connector token in cloud-init (Phase 3) | Fastest bootstrap; Key Vault arrives in Phase 4 | Token visible in VM custom data and Terraform state | Phase 4: managed identity + Key Vault ([ADR-003](docs/adr/ADR-003-connector-token-handling.md)) |
+| Storage shared-key auth still enabled | The module default preserves current behaviour; Phase 4 moves to Entra ID/RBAC | A stolen account key grants data-plane access | Phase 4: `shared_access_key_enabled = false` and verify V8 |
+| Broad HTTPS egress from `hub-access` in Phases 2–5 | The connector must reach Twingate before the firewall exists | A compromised connector can reach any HTTPS destination | Phase 6: FQDN allow-list and removal of the temporary rule ([ADR-006](docs/adr/ADR-006-nat-then-firewall.md)) |
 
 ## Inputs
 

@@ -4,7 +4,7 @@ Companion to [`SPEC.md`](./SPEC.md). The spec says *what and why*; this file say
 
 **Status legend:** Not Started, In Progress, Blocked, At Risk, Done
 
-**Last updated:** 2026-10-18
+**Last updated:** 2026-10-19
 
 ---
 
@@ -12,7 +12,7 @@ Companion to [`SPEC.md`](./SPEC.md). The spec says *what and why*; this file say
 
 | Order | Phase | Theme | Effort | Cost while testing | Status |
 |---|---|---|---|---|---|
-| 1 | **0** | Documentation foundation | ~0.5 weekend | none | Not Started |
+| 1 | **0** | Documentation foundation | ~0.5 weekend | none | Done |
 | 2 | **1** | Automation and guardrails | ~1 weekend | none | Not Started |
 | 3 | **2** | Controlled egress (NAT) + hub-access subnet | ~0.5 weekend | low (NAT GW) | Not Started |
 | 4 | **3** | Identity-based access (Twingate + Entra ID) | ~1.5 weekends | low (1 VM + NAT) | Not Started |
@@ -59,11 +59,11 @@ Cross-links:
 **Spec:** R0.1 to R0.4
 
 Checklist
-- [ ] `docs/THREAT-MODEL.md` seeded from SPEC 9.1, each control linked to a file path
-- [ ] README: "Accepted exceptions" table (flow register F1 now, others added as they land)
-- [ ] README: "Known trade-offs" (PE subnet without NSG, direct spoke peering, connector token handling)
-- [ ] `docs/adr/` with template; write ADR-001 (VNet flow logs), ADR-002 (direct peering), ADR-006 (NAT then Firewall)
-- [ ] `docs/evidence/` folder created
+- [x] `docs/THREAT-MODEL.md` seeded from SPEC 9.1, each control linked to a file path
+- [x] README: "Accepted exceptions" table (flow register F1 now, others added as they land)
+- [x] README: "Known trade-offs" (PE subnet without NSG, direct spoke peering, connector token handling)
+- [x] `docs/adr/` with template; write ADR-001 (VNet flow logs), ADR-002 (direct peering), ADR-006 (NAT then Firewall) — plus ADR-003 for the Phase 3 dependency
+- [x] `docs/evidence/` folder created
 
 Done when: a reader can learn the design's weak points from the README without reading code.
 
@@ -73,6 +73,7 @@ Done when: a reader can learn the design's weak points from the README without r
 
 **Goal:** a bad change cannot merge; zero-trust invariants are tested.
 **Spec:** R1.1 to R1.7, tests T1 to T8
+**Plan:** [`docs/PHASE-1-PLAN.md`](./docs/PHASE-1-PLAN.md)
 
 Checklist
 - [ ] `.github/workflows/ci.yml`: fmt-check, validate (no backend), tflint, Checkov/Trivy
@@ -282,3 +283,4 @@ End of session
 | Date | Change |
 |---|---|
 | 2026-10-18 | Initial roadmap. Firewall moved from Phase 2 to Phase 6; flow-log approach changed from NSG to VNet flow logs (NSG flow logs cannot be created and retire 2027-09-30). |
+| 2026-10-19 | Phase 0 complete: threat model, ADRs 001/002/003/006, accepted-exceptions and known-trade-offs tables, evidence folder. Phase 1 plan added. |
