@@ -2,9 +2,9 @@
 
 Companion to [`SPEC.md`](./SPEC.md). The spec says *what and why*; this file says *in what order, how to check it, and what to show*.
 
-**Status legend:** Not Started, In Progress, Blocked, At Risk, Done
+**Status legend:** Not Started, In Progress, Blocked, At Risk, Done, Skipped
 
-**Last updated:** 2026-10-18
+**Last updated:** 2026-10-20
 
 ---
 
@@ -12,8 +12,8 @@ Companion to [`SPEC.md`](./SPEC.md). The spec says *what and why*; this file say
 
 | Order | Phase | Theme | Effort | Cost while testing | Status |
 |---|---|---|---|---|---|
-| 1 | **0** | Documentation foundation | ~0.5 weekend | none | Not Started |
-| 2 | **1** | Automation and guardrails | ~1 weekend | none | Not Started |
+| 1 | **0** | Documentation foundation | ~0.5 weekend | none | Skipped |
+| 2 | **1** | Automation and guardrails | ~1 weekend | none | Done |
 | 3 | **2** | Controlled egress (NAT) + hub-access subnet | ~0.5 weekend | low (NAT GW) | Not Started |
 | 4 | **3** | Identity-based access (Twingate + Entra ID) | ~1.5 weekends | low (1 VM + NAT) | Not Started |
 | 5 | **4** | Workloads, managed identity, Key Vault | ~1 weekend | low (3 VMs) | Not Started |
@@ -44,7 +44,7 @@ Cross-links:
 
 ## 3. Working agreements
 
-- **One phase = one branch = one PR = one release tag** (`v1.1.0`, ...). CI must be green before merge (from Phase 1 on).
+- **One phase = one commit series on `master` = module release tags.** This is a learning project, so work goes directly to `master` without PRs; CI must be green after each push (from Phase 1 on).
 - Costly resources stay behind flags (see SPEC 6.3). `make down` at the end of every session.
 - Every deliberate hole in default-deny goes in the README "Accepted exceptions" table in the same PR that adds it.
 - Write the ADR *before* the code it justifies.
@@ -75,20 +75,20 @@ Done when: a reader can learn the design's weak points from the README without r
 **Spec:** R1.1 to R1.7, tests T1 to T8
 
 Checklist
-- [ ] `.github/workflows/ci.yml`: fmt-check, validate (no backend), tflint, Checkov/Trivy
-- [ ] Scanner config with a justified-skip list (every skip has a reason)
-- [ ] `modules/network/tests/network.tftest.hcl`: T1, T2, T3, T7 (use `mock_provider "azurerm"`, `command = plan`, `expect_failures` for the overlap test)
-- [ ] `modules/storage/tests/storage.tftest.hcl`: T4
-- [ ] Tag test T8 across modules
-- [ ] `make test` target; CI runs it offline
-- [ ] HCP speculative plan on PR (or document the manual alternative)
-- [ ] `.pre-commit-config.yaml` with terraform-docs; `make hooks`
-- [ ] Extra policies in `module.policy` (look up built-in IDs with `az policy definition list`; custom definition for "no inbound 22/3389 from *"); start tag policy as Audit
-- [x] Modules published from the VCS-backed private registry at v1.0.0 — releases are git tags (`network-vX.Y.Z`, `storage-vX.Y.Z`, `policy-vX.Y.Z`)
-- [ ] Branch protection requiring CI (screenshot)
+- [x] `.github/workflows/ci.yml`: fmt-check, per-module validate (no backend), tflint, Checkov
+- [x] Scanner config with a justified-skip list (every skip has a reason)
+- [x] `modules/network/tests/network.tftest.hcl`: T1, T2, T3, T7 (use `mock_provider "azurerm"`, `command = plan`, `expect_failures` for the overlap test)
+- [x] `modules/storage/tests/storage.tftest.hcl`: T4
+- [x] Tag test T8 across modules
+- [x] `make test` target; CI runs it offline
+- [x] Speculative plan in CI via the `TF_TOKEN` secret; the HCP cloud backend runs it remotely and CI cannot apply
+- [x] `.pre-commit-config.yaml` with terraform-docs; `make hooks`
+- [x] Extra policies in `module.policy` (built-in IDs verified with `az policy definition list`; custom definition for "no inbound 22/3389 from *"); tag policies start as Audit
+- [x] Modules published from the VCS-backed private registry at v1.1.0 — releases are git tags (`network-vX.Y.Z`, `storage-vX.Y.Z`, `policy-vX.Y.Z`)
+- [ ] Branch protection requiring CI — consciously deferred: this project commits directly to `master` (no PR flow)
 
-Evidence: screenshot of a deliberately bad PR failing CI.
-Done when: the bad PR fails, the clean PR passes in under 5 minutes, tests run without Azure credentials.
+Evidence: a deliberately broken NSG rule failed `terraform test` locally; the clean workflow passes in CI.
+Done when: the bad change fails, the clean run passes in under 5 minutes, tests run without Azure credentials.
 
 Watch out: Checkov will flag things like customer-managed keys and geo-replication; skip with a written reason, do not blanket-skip.
 
@@ -281,4 +281,5 @@ End of session
 
 | Date | Change |
 |---|---|
+| 2026-10-20 | Phase 1 done: CI (fmt, validate, test, tflint, Checkov, remote plan via TF_TOKEN), offline T1-T4/T7/T8 tests, network module 1.1.0 and policy module 1.1.0, extra policy assignments. Phase 0 skipped. Branch protection deferred (direct-to-master workflow). |
 | 2026-10-18 | Initial roadmap. Firewall moved from Phase 2 to Phase 6; flow-log approach changed from NSG to VNet flow logs (NSG flow logs cannot be created and retire 2027-09-30). |

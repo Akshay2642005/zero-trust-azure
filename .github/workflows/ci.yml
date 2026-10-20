@@ -118,7 +118,9 @@ jobs:
       - name: Plan (remote, speculative)
         env:
           TF_TOKEN_app_terraform_io: ${{ secrets.TF_TOKEN }}
-        run: terraform -chdir=envs/dev plan -input=false -no-color | tee plan.txt
+        run: |
+          set -o pipefail
+          terraform -chdir=envs/dev plan -input=false -no-color | tee plan.txt
       - name: Plan summary
         if: always()
         run: |
