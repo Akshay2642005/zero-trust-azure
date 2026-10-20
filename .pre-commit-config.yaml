@@ -9,8 +9,14 @@ repos:
       - id: terraform_tflint
         args:
           - --hook-config=--delegate-chdir
-      - id: terraform_docs
-        args:
-          - --hook-config=--path-to-file=README.md
-          - --hook-config=--add-to-existing-file=true
-          - --hook-config=--create-file-if-not-exist=true
+
+  # Run terraform-docs from the repository root so it reads .terraform-docs.yml.
+  # The upstream hook changes directory into each module and loses the config.
+  - repo: local
+    hooks:
+      - id: terraform-docs
+        name: terraform docs
+        entry: bash -c 'for dir in modules/*/; do terraform-docs "$dir"; done'
+        language: system
+        files: ^modules/.*\.tf$
+        pass_filenames: false
