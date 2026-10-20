@@ -25,3 +25,15 @@ skip-check:
   # LRS is intentional for a cost-controlled development environment; changing
   # the replication strategy is a separate availability/cost decision.
   - CKV_AZURE_206
+
+  # Customer-managed keys are out of scope: platform-managed encryption at rest
+  # is sufficient for this learning environment (explicitly noted in SPEC 7.2).
+  - CKV2_AZURE_1
+
+  # Shared-key access is removed in Phase 4 (R4.4), once managed identities and
+  # RBAC exist. The module already exposes shared_access_key_enabled for that.
+  - CKV2_AZURE_40
+
+  # No SAS tokens are issued; blob access goes through managed identity, so a
+  # SAS expiration policy would be configuration without a consumer.
+  - CKV2_AZURE_41
