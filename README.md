@@ -370,6 +370,42 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
   `Not allowed resource types` assignment.
 - **Secretless** — the deploying principal is an OIDC service principal; no
   client secret is stored in the repository, the workspace, or CI.
+- **Policy guardrails** — enforced assignments deny public network access,
+  plain-HTTP and sub-TLS-1.2 storage, and NSG rules that open inbound SSH/RDP to
+  the internet. `managed-by`, `project` and `environment` tag policies start as
+  Audit and can be promoted to Deny once the estate is clean.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on pull requests and on pushes to `master`:
+
+| Job | Runs | Needs a token? |
+|-----|------|----------------|
+| `fmt` | `terraform fmt -recursive -check` | no |
+| `validate` | `terraform validate` for every module (`-backend=false`) | no |
+| `test` | `terraform test` for every module; provider-mocked and offline | no |
+| `tflint` | `tflint --recursive` with the azurerm ruleset | no |
+| `checkov` | Checkov with the justified-skip list in `.checkov.yaml` | no |
+| `plan` | `terraform plan` against the HCP Terraform workspace | yes |
+
+The plan job uses the `TF_TOKEN` repository secret (exposed as
+`TF_TOKEN_app_terraform_io`). Because `envs/dev` uses the HCP Terraform cloud
+backend, the plan executes as a **remote speculative run** — Azure credentials
+stay in the workspace (OIDC), and nothing in CI can apply. The plan output is
+posted to the workflow step summary.
+
+One-time setup:
+
+```bash
+gh secret set TF_TOKEN   # paste an HCP Terraform user/team token
+```
+
+Run the same gates locally:
+
+```bash
+make check     # fmt-check + validate-modules + test + lint + security
+make hooks     # install the pre-commit hooks (fmt, validate, tflint, terraform-docs)
+```
 
 ## Inputs
 
@@ -401,6 +437,7 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
 | `storage_private_endpoint_id` | Blob private endpoint resource ID |
 | `storage_private_endpoint_ip` | Private IP allocated to the endpoint |
 | `policy_assignment_id` | Deny-public-IP-on-NIC assignment ID |
+| `policy_assignment_ids` | Map of every policy assignment name to its ID |
 
 ## Skills demonstrated
 

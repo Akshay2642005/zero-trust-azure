@@ -1,0 +1,27 @@
+# Checkov configuration.
+#
+# Every skip below is deliberate and carries a one-line reason. Do not add
+# blanket skips; extend the code or add a justified entry instead.
+
+framework:
+  - terraform
+
+compact: true
+quiet: true
+soft-fail: false
+
+skip-path:
+  - "**/.terraform"
+  - ".git"
+
+skip-check:
+  # The root module consumes private-registry modules pinned to exact semver
+  # versions (envs/dev/main.tf), not git URLs, so there is no commit hash to pin.
+  - CKV_TF_1
+
+  # The queue service is not used; only blob storage is in scope for this project.
+  - CKV_AZURE_33
+
+  # LRS is intentional for a cost-controlled development environment; changing
+  # the replication strategy is a separate availability/cost decision.
+  - CKV_AZURE_206

@@ -79,6 +79,26 @@ variable "allow_forwarded_traffic" {
   default     = true
 }
 
+variable "nsg_allowlist_exceptions" {
+  description = "Allow rules that may use a wildcard or Internet address prefix. Every entry is a documented exception; anything not listed here is rejected by the test suite."
+
+  type = list(object({
+    nsg    = string
+    rule   = string
+    field  = string
+    reason = string
+  }))
+
+  default = [
+    {
+      nsg    = "spoke2"
+      rule   = "AllowHttpsToSpoke1Workload"
+      field  = "source_address_prefix"
+      reason = "Outbound rule; the destination is pinned to the spoke workload prefix."
+    },
+  ]
+}
+
 variable "tags" {
   description = "Tags applied to every resource that supports them."
   type        = map(string)

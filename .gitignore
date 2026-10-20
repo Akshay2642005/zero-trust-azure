@@ -36,4 +36,6 @@ override.tf.json
 
 # NOTE: the dependency lock file (.terraform.lock.hcl) is intentionally NOT
 # ignored — commit it so every run resolves the exact same provider versions.
+# Modules are reusable packages, so only the root module commits a lock file.
+modules/*/.terraform.lock.hcl
 .DS_Store

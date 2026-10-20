@@ -11,6 +11,75 @@ locals {
       priority  = 4096
     }
   }
+
+  # --- IPv4 overlap detection (T7) ---
+  #
+  # Terraform has no "is contained in" CIDR function, so convert each prefix
+  # to a numeric range. Only the address spaces of the three VNets are checked;
+  # subnet placement inside a VNet is validated by Azure.
+
+  octet_bits = {
+    "0"   = 0, "128" = 1, "192" = 2, "224" = 3,
+    "240" = 4, "248" = 5, "252" = 6, "254" = 7, "255" = 8,
+  }
+
+  vnet_address_spaces = {
+    hub    = var.hub_address_space
+    spoke  = var.spoke_address_space
+    spoke2 = var.spoke2_address_space
+  }
+
+  cidr_ranges = {
+    for cidr in distinct(flatten(values(local.vnet_address_spaces))) : cidr => {
+      start  = sum([for i, octet in split(".", cidrhost(cidr, 0)) : tonumber(octet) * pow(256, 3 - i)])
+      length = pow(2, 32 - sum([for octet in split(".", cidrnetmask(cidr)) : lookup(local.octet_bits, octet, 0)]))
+    }
+  }
+
+  address_ranges = flatten([
+    for vnet, spaces in local.vnet_address_spaces : [
+      for cidr in spaces : {
+        vnet  = vnet
+        start = local.cidr_ranges[cidr].start
+        end   = local.cidr_ranges[cidr].start + local.cidr_ranges[cidr].length - 1
+      }
+    ]
+  ])
+
+  nsg_resources = {
+    hub    = azurerm_network_security_group.hub
+    spoke  = azurerm_network_security_group.spoke
+    spoke2 = azurerm_network_security_group.spoke2
+  }
+
+  # Every Allow rule that uses a wildcard address prefix, tagged with the field
+  # that is wildcard. Compared against var.nsg_allowlist_exceptions below.
+  wildcard_allow_rules = flatten([
+    for nsg_name, nsg in local.nsg_resources : [
+      for rule in nsg.security_rule : [
+        for field in ["source_address_prefix", "destination_address_prefix"] : {
+          nsg   = nsg_name
+          rule  = rule.name
+          field = field
+        } if rule.access == "Allow" && contains(["*", "0.0.0.0/0", "Internet"], try(rule[field], ""))
+      ]
+    ]
+  ])
+}
+
+# T2 as continuous validation: a new wildcard allow rule that is not in the
+# documented allow-list shows up on every plan.
+check "wildcard_allow_rules_are_documented" {
+  assert {
+    condition = alltrue([
+      for item in local.wildcard_allow_rules : anytrue([
+        for exception in var.nsg_allowlist_exceptions :
+        exception.nsg == item.nsg && exception.rule == item.rule && exception.field == item.field
+      ])
+    ])
+
+    error_message = "Every NSG allow rule with a wildcard address prefix must be listed in var.nsg_allowlist_exceptions with a reason."
+  }
 }
 
 # --- Network Security Groups ---
@@ -120,6 +189,20 @@ resource "azurerm_virtual_network" "hub" {
   location            = var.location
   resource_group_name = var.resource_group_name
   tags                = var.tags
+
+  # T7: overlapping VNet address spaces break routing and peering. This is a
+  # hard plan-time failure, not a warning.
+  lifecycle {
+    precondition {
+      condition = alltrue([
+        for a in local.address_ranges : alltrue([
+          for b in local.address_ranges :
+          a.vnet == b.vnet || a.end < b.start || b.end < a.start
+        ])
+      ])
+      error_message = "VNet address spaces must not overlap: hub, spoke and spoke2 require distinct, non-overlapping ranges."
+    }
+  }
 }
 
 resource "azurerm_virtual_network" "spoke" {
