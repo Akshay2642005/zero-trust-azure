@@ -72,7 +72,7 @@ its own deny-all NSG.*
 
 | Component | CIDR | Subnets |
 |---|---|---|
-| `hub-vnet` — the hub | `10.0.0.0/16` | `hub-default` `10.0.1.0/24` |
+| `hub-vnet` — the hub | `10.0.0.0/16` | `hub-default` `10.0.1.0/24`, `hub-access` `10.0.4.0/27` |
 | `spoke-vnet` — spoke 1 | `10.1.0.0/16` | `spoke-workload` `10.1.0.0/24`, `spoke-private-endpoints` `10.1.1.0/24` |
 | `spoke2-vnet` — spoke 2 | `10.2.0.0/16` | `spoke2-workload` `10.2.0.0/24` |
 
@@ -91,8 +91,10 @@ extending the module inputs without touching the rules that guard the others.
 - **Guardrails, not conventions.** An enforced Azure Policy assignment rejects
   NICs with public IPs, so the environment can't quietly drift back to public
   exposure.
-- **One explicit exception.** A single narrowly-scoped flow — HTTPS `443` from
-  spoke2 to spoke1 — is the only thing crossing the segment boundary.
+- **Exceptions are explicit.** East-west, a single narrowly-scoped flow — HTTPS
+  `443` from spoke2 to spoke1 — crosses the segment boundary. The only
+  internet-bound exception is a temporary, off-by-default HTTPS egress rule on
+  `hub-access`, removed when Azure Firewall lands in Phase 6.
 
 ## Microsegmentation
 
@@ -137,6 +139,35 @@ only.*
 The private-endpoints subnet is intentionally left **without** an NSG so
 private-link traffic is not dropped before it reaches the endpoint.
 
+## Controlled egress (Phase 2)
+
+![Phase 2 target](docs/diagrams/05-phase2-target.svg)
+
+*The Twingate connector gets its own `hub-access` subnet, a deny-all NSG, and an
+optional NAT Gateway. The only permitted outbound flow is TCP `443` from that
+subnet to `Internet` — a documented temporary exception, not a default.*
+
+- **`hub-access` (`10.0.4.0/27`)** — a dedicated connector subnet, separate from
+  `hub-default`, so the connector's egress exception and future inbound rules
+  cannot widen the hub's policy.
+- **`hub-access-nsg`** — same default-deny baseline as every other subnet. It
+  carries one conditional outbound rule, `AllowHttpsToInternet`, enabled only
+  while NAT is the egress path. The rule is listed as accepted exception **F5**
+  and allow-listed in the network module's wildcard-rule check.
+- **`module.egress` (v0.1.0)** — a Standard NAT Gateway with one static Standard
+  public IP, associated only with `hub-access`. The IP is an outbound SNAT
+  address attached to the gateway, not to a NIC or VM; it has no listener and
+  does not make the subnet reachable from the internet.
+- **Off by default** — `deploy_egress_nat` defaults to `false` because the
+  gateway and public IP cost roughly **$35–40/month**. Enabling it also enables
+  the F5 rule, so the exception cannot exist without the egress path that
+  justifies it.
+
+This is an interim control. [ADR-006](docs/adr/ADR-006-nat-then-firewall.md)
+records why NAT comes before Azure Firewall and defines the Phase 6 removal
+trigger: firewall application rules for the Twingate FQDNs replace both the NAT
+Gateway and the destination-wide HTTPS allow.
+
 ## Delivery and authentication
 
 ![Delivery architecture](docs/diagrams/03-deployment.svg)
@@ -148,8 +179,9 @@ anywhere.*
 
 - **Remote runs and state** — HCP Terraform (Terraform Cloud) executes plans and
   applies; state lives there and is never committed.
-- **Versioned modules** — the environment root consumes `network`, `storage` and
-  `policy` by version from the private registry, not by relative path.
+- **Versioned modules** — the environment root consumes `network`, `egress`,
+  `storage` and `policy` by version from the private registry, not by relative
+  path.
 - **Secretless auth** — dynamic provider credentials via OIDC federation; the
   workspace holds no long-lived Azure credential.
 
@@ -158,14 +190,16 @@ anywhere.*
 | Resource | Notes |
 |----------|-------|
 | Resource group | `zt-rg`, managed by Terraform |
-| `hub-nsg`, `spoke-nsg`, `spoke2-nsg` | default-deny inbound **and** outbound |
+| `hub-nsg`, `hub-access-nsg`, `spoke-nsg`, `spoke2-nsg` | default-deny inbound **and** outbound |
 | `hub-vnet` `10.0.0.0/16` | the hub network |
 | `spoke-vnet` `10.1.0.0/16` | first workload network |
 | `spoke2-vnet` `10.2.0.0/16` | second, isolated workload segment |
-| `hub-default`, `spoke-workload`, `spoke2-workload` | subnets with the NSGs associated |
+| `hub-default`, `hub-access`, `spoke-workload`, `spoke2-workload` | subnets with the NSGs associated |
 | `spoke-private-endpoints` | open subnet reserved for private endpoints |
 | bidirectional peering | hub↔each spoke, plus a direct spoke1↔spoke2 pair |
-| HTTPS allow (spoke2 → spoke1) | the one exception to default-deny: `443` to the spoke1 workload subnet |
+| HTTPS allow (spoke2 → spoke1) | the one east-west exception to default-deny: `443` to the spoke1 workload subnet |
+| NAT Gateway + static public IP | optional (`deploy_egress_nat`), associated only with `hub-access`; outbound SNAT with no inbound path |
+| HTTPS allow (`hub-access` → `Internet`) | temporary F5 exception, enabled only with the NAT Gateway and removed in Phase 6 |
 | `ztstorage` | StorageV2, TLS 1.2+, HTTPS-only, public access disabled |
 | `privatelink.blob.core.windows.net` | private DNS zone, linked to the spoke VNet |
 | `pe-storage-blob` | private endpoint + DNS zone group |
@@ -273,7 +307,7 @@ registry**, pinned by version:
 ```hcl
 module "network" {
   source  = "app.terraform.io/<org>/network/azurerm"
-  version = "1.0.0"
+  version = "1.2.0"
 }
 ```
 
@@ -289,14 +323,15 @@ matching tag publishes that version automatically — there is no upload step.
 | Module | Source directory | Tag prefix | Release tag |
 |---|---|---|---|
 | `network` | `modules/network` | `network-` | `network-vX.Y.Z` |
+| `egress` | `modules/egress` | `egress-` | `egress-vX.Y.Z` |
 | `storage` | `modules/storage` | `storage-` | `storage-vX.Y.Z` |
 | `policy` | `modules/policy` | `policy-` | `policy-vX.Y.Z` |
 
 To release a new module version, push its tag:
 
 ```bash
-git tag network-v1.1.0                      # or storage-* / policy-*
-git push origin network-v1.1.0
+git tag network-v1.2.0                      # or egress-* / storage-* / policy-*
+git push origin network-v1.2.0
 ```
 
 Then point the root at the new version (`envs/dev/main.tf`), re-init and plan:
@@ -348,7 +383,7 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
 
 ## Security posture
 
-- **Default deny** — all three NSGs drop all inbound and outbound traffic unless
+- **Default deny** — all four NSGs drop all inbound and outbound traffic unless
   a higher-priority rule allows it.
 - **Microsegmentation** — each spoke is isolated by its own deny-all NSG. spoke2
   reaches spoke1's workload subnet over HTTPS (`443`) and nothing else; a third
@@ -374,6 +409,20 @@ scripts/teardown-oidc.rb             # prompts for confirmation; --yes to skip
   plain-HTTP and sub-TLS-1.2 storage, and NSG rules that open inbound SSH/RDP to
   the internet. `managed-by`, `project` and `environment` tag policies start as
   Audit and can be promoted to Deny once the estate is clean.
+
+### Accepted exceptions
+
+Everything not listed here is denied by the default-deny NSGs. Each entry is a
+deliberate hole with a named exit condition; new holes go in this table in the
+same change that adds them.
+
+| ID | Flow | Why it exists | Exit condition |
+|---|---|---|---|
+| **F1** | `spoke2-workload` → `spoke-workload` TCP `443` | Demonstrates microsegmentation across segments without a hub NVA: the two spokes peer directly and exactly one workload flow is allowed. | Phase 6 routes inter-spoke traffic through Azure Firewall; the direct peering and both `443` rules are removed. |
+| **F5** | `hub-access` → `Internet` TCP `443` | The Twingate connector initiates outbound connections and has no public IP. NAT Gateway provides the path; the NSG cannot express the vendor's FQDNs, so the allow is destination-wide. | Phase 6 replaces NAT with Azure Firewall application rules for the Twingate FQDNs. The rule, its allow-list entry, and `deploy_egress_nat` are removed together. |
+
+F5 is off by default. It is created only when `deploy_egress_nat = true`, so the
+exception and the billable egress path are enabled and removed as one unit.
 
 ## Continuous integration
 
@@ -418,6 +467,8 @@ make hooks     # install the pre-commit hooks (fmt, validate, tflint, terraform-
 | `hub_address_space` | Hub VNet address space | `["10.0.0.0/16"]` |
 | `spoke_address_space` | Spoke VNet address space | `["10.1.0.0/16"]` |
 | `hub_default_subnet_prefix` | Hub default subnet | `10.0.1.0/24` |
+| `hub_access_subnet_prefix` | Connector subnet in the hub | `10.0.4.0/27` |
+| `deploy_egress_nat` | Deploy NAT Gateway and the temporary F5 egress rule | `false` |
 | `spoke_workload_subnet_prefix` | Spoke workload subnet | `10.1.0.0/24` |
 | `spoke_pe_subnet_prefix` | Spoke private-endpoints subnet | `10.1.1.0/24` |
 | `spoke2_address_space` | Second spoke VNet address space | `["10.2.0.0/16"]` |
@@ -433,6 +484,9 @@ make hooks     # install the pre-commit hooks (fmt, validate, tflint, terraform-
 | `hub_vnet_id` | Hub VNet resource ID |
 | `spoke_vnet_id` | Spoke VNet resource ID |
 | `spoke2_vnet_id` | Second spoke VNet resource ID |
+| `hub_access_subnet_id` | Connector subnet resource ID |
+| `hub_access_nsg_id` | Connector subnet NSG resource ID |
+| `nat_public_ip` | NAT Gateway outbound public IP, or `null` when disabled |
 | `storage_account_name` | Storage account name |
 | `storage_private_endpoint_id` | Blob private endpoint resource ID |
 | `storage_private_endpoint_ip` | Private IP allocated to the endpoint |

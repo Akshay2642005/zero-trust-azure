@@ -7,7 +7,7 @@ resource "azurerm_resource_group" "this" {
 
 module "network" {
   source  = "app.terraform.io/akshay2642005/network/azurerm"
-  version = "1.1.0"
+  version = "1.2.0"
 
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
@@ -16,11 +16,32 @@ module "network" {
   hub_address_space             = var.hub_address_space
   spoke_address_space           = var.spoke_address_space
   hub_default_subnet_prefix     = var.hub_default_subnet_prefix
+  hub_access_subnet_prefix      = var.hub_access_subnet_prefix
   spoke_workload_subnet_prefix  = var.spoke_workload_subnet_prefix
   spoke_pe_subnet_prefix        = var.spoke_pe_subnet_prefix
   spoke2_address_space          = var.spoke2_address_space
   spoke2_workload_subnet_prefix = var.spoke2_workload_subnet_prefix
   allow_forwarded_traffic       = var.allow_forwarded_traffic
+
+  # Temporary F5 exception (ADR-006). The rule exists only while NAT is the
+  # connector's egress path; Phase 6 replaces it with firewall FQDN rules.
+  allow_hub_access_internet_443 = var.deploy_egress_nat
+
+  tags = local.common_tags
+}
+
+# Controlled egress for the hub-access subnet. Off by default because the NAT
+# Gateway and its public IP are billable (roughly $35-40/month). Enable with
+# deploy_egress_nat = true when the Twingate connector is deployed (Phase 3).
+module "egress" {
+  source  = "app.terraform.io/akshay2642005/egress/azurerm"
+  version = "0.1.0"
+  count   = var.deploy_egress_nat ? 1 : 0
+
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  naming              = local.egress_naming
+  subnet_id           = module.network.hub_access_subnet_id
 
   tags = local.common_tags
 }

@@ -43,6 +43,18 @@ variable "hub_default_subnet_prefix" {
   default     = "10.0.1.0/24"
 }
 
+variable "hub_access_subnet_prefix" {
+  description = "Address prefix for the hub access subnet that hosts the Twingate connector."
+  type        = string
+  default     = "10.0.4.0/27"
+}
+
+variable "deploy_egress_nat" {
+  description = "Whether to deploy the NAT Gateway and temporary F5 egress exception for the hub access subnet. Billable (~$35-40/month)."
+  type        = bool
+  default     = false
+}
+
 variable "spoke_workload_subnet_prefix" {
   description = "Address prefix for the spoke workload subnet."
   type        = string

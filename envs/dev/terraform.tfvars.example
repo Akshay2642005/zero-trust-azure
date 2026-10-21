@@ -3,3 +3,7 @@ subscription_id      = "00000000-0000-0000-0000-000000000000"
 location             = "eastus"
 environment          = "dev"
 storage_account_name = "ztstorage00001"
+
+# Phase 2 egress. Leave false unless the Twingate connector is deployed and
+# outbound access is needed; the NAT Gateway is billable (~$35-40/month).
+deploy_egress_nat = false

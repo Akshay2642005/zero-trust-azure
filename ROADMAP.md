@@ -98,15 +98,18 @@ Watch out: Checkov will flag things like customer-managed keys and geo-replicati
 
 **Goal:** a place for the connector to live, with a deliberate, temporary way out.
 **Spec:** R2.1 to R2.4
+**Status:** code, tests, registry release and plan complete; real apply pending.
 
 Checklist
-- [ ] ADR-006 written
-- [ ] `hub-access` subnet 10.0.4.0/27 + NSG with deny-all baseline (T1 passes)
-- [ ] `module.egress` NAT mode: NAT Gateway + public IP on `hub-access`, behind `deploy_egress_nat`
-- [ ] `hub-access` NSG: outbound TCP/443 to `Internet` service tag, tagged as temporary
-- [ ] Add to accepted-exceptions table: "temporary Internet:443 from hub-access (removed Phase 6)"
-- [ ] Output NAT public IP
-- [ ] Test: NAT policy interplay (does the NIC public-IP policy object?) (Q4)
+- [x] ADR-006 written
+- [x] `hub-access` subnet 10.0.4.0/27 + NSG with deny-all baseline (T1 passes)
+- [x] `module.egress` NAT mode: NAT Gateway + public IP on `hub-access`, behind `deploy_egress_nat`
+- [x] `hub-access` NSG: outbound TCP/443 to `Internet` service tag, tagged as temporary
+- [x] Add to accepted-exceptions table: "temporary Internet:443 from hub-access (removed Phase 6)"
+- [x] Output NAT public IP
+- [ ] Test: NAT policy interplay (does the NIC public-IP policy object?) (Q4) — needs the real apply
+- [x] Publish `network-v1.2.0` and `egress-v0.1.0`, wire `envs/dev` to them
+- [x] Remote plan with `deploy_egress_nat=true`: 40 resources, no errors
 
 Done when: `deploy_egress_nat=true` applies cleanly and only `hub-access` has NAT.
 

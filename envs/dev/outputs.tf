@@ -18,6 +18,21 @@ output "spoke2_vnet_id" {
   value       = module.network.spoke2_vnet_id
 }
 
+output "hub_access_subnet_id" {
+  description = "Resource ID of the hub access subnet that hosts the Twingate connector."
+  value       = module.network.hub_access_subnet_id
+}
+
+output "hub_access_nsg_id" {
+  description = "Resource ID of the hub access network security group."
+  value       = module.network.hub_access_nsg_id
+}
+
+output "nat_public_ip" {
+  description = "Outbound public IP of the NAT Gateway, or null when deploy_egress_nat is false."
+  value       = one(module.egress[*].nat_public_ip)
+}
+
 output "storage_account_name" {
   description = "Name of the storage account."
   value       = module.storage.storage_account_name

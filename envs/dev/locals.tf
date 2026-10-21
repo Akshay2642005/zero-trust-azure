@@ -8,10 +8,12 @@ locals {
     spoke_vnet              = "spoke-vnet"
     spoke2_vnet             = "spoke2-vnet"
     hub_default_subnet      = "hub-default"
+    hub_access_subnet       = "hub-access"
     spoke_workload_subnet   = "spoke-workload"
     spoke_pe_subnet         = "spoke-private-endpoints"
     spoke2_workload_subnet  = "spoke2-workload"
     hub_nsg                 = "hub-nsg"
+    hub_access_nsg          = "hub-access-nsg"
     spoke_nsg               = "spoke-nsg"
     spoke2_nsg              = "spoke2-nsg"
     hub_to_spoke_peering    = "hub-to-spoke"
@@ -20,6 +22,12 @@ locals {
     spoke2_to_hub_peering   = "spoke2-to-hub"
     spoke_to_spoke2_peering = "spoke-to-spoke2"
     spoke2_to_spoke_peering = "spoke2-to-spoke"
+  }
+
+  # Names owned by the egress module.
+  egress_naming = {
+    nat_gateway   = "hub-access-nat"
+    nat_public_ip = "hub-access-nat-ip"
   }
 
   # Names owned by the storage module.
