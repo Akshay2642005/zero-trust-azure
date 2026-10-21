@@ -42,6 +42,7 @@ run "deny_all_rules_present" {
     condition = alltrue([
       for nsg in [
         azurerm_network_security_group.hub,
+        azurerm_network_security_group.hub_access,
         azurerm_network_security_group.spoke,
         azurerm_network_security_group.spoke2,
         ] : alltrue([
@@ -66,9 +67,10 @@ run "wildcard_allow_rules_are_allowlisted" {
     condition = alltrue([
       for item in flatten([
         for nsg_name, nsg in {
-          hub    = azurerm_network_security_group.hub
-          spoke  = azurerm_network_security_group.spoke
-          spoke2 = azurerm_network_security_group.spoke2
+          hub        = azurerm_network_security_group.hub
+          hub_access = azurerm_network_security_group.hub_access
+          spoke      = azurerm_network_security_group.spoke
+          spoke2     = azurerm_network_security_group.spoke2
           } : [
           for rule in nsg.security_rule : {
             nsg  = nsg_name
@@ -97,9 +99,10 @@ run "management_ports_not_open_to_the_internet" {
     condition = alltrue([
       for item in flatten([
         for nsg_name, nsg in {
-          hub    = azurerm_network_security_group.hub
-          spoke  = azurerm_network_security_group.spoke
-          spoke2 = azurerm_network_security_group.spoke2
+          hub        = azurerm_network_security_group.hub
+          hub_access = azurerm_network_security_group.hub_access
+          spoke      = azurerm_network_security_group.spoke
+          spoke2     = azurerm_network_security_group.spoke2
           } : [
           for rule in nsg.security_rule : {
             nsg  = nsg_name
@@ -127,6 +130,7 @@ run "required_tags_on_network_resources" {
         azurerm_virtual_network.spoke,
         azurerm_virtual_network.spoke2,
         azurerm_network_security_group.hub,
+        azurerm_network_security_group.hub_access,
         azurerm_network_security_group.spoke,
         azurerm_network_security_group.spoke2,
         ] : alltrue([
@@ -135,6 +139,60 @@ run "required_tags_on_network_resources" {
     ])
 
     error_message = "T8: every taggable network resource must carry managed-by, project and environment."
+  }
+}
+
+run "hub_access_subnet_is_created" {
+  command = plan
+
+  assert {
+    condition = (
+      azurerm_subnet.hub_access.name == "hub-access" &&
+      contains(azurerm_subnet.hub_access.address_prefixes, "10.0.4.0/27") &&
+      length(azurerm_subnet.hub_access.address_prefixes) == 1 &&
+      azurerm_network_security_group.hub_access.name == "hub-access-nsg"
+    )
+
+    error_message = "R2.1: hub-access must be created as 10.0.4.0/27 with its own NSG."
+  }
+}
+
+run "temporary_internet_rule_is_off_by_default" {
+  command = plan
+
+  assert {
+    condition = length([
+      for rule in azurerm_network_security_group.hub_access.security_rule : rule
+      if rule.name == "AllowHttpsToInternet"
+    ]) == 0
+
+    error_message = "F5 must not exist unless allow_hub_access_internet_443 is enabled."
+  }
+}
+
+run "temporary_internet_rule_when_enabled" {
+  command = plan
+
+  variables {
+    allow_hub_access_internet_443 = true
+  }
+
+  assert {
+    condition = length([
+      for rule in azurerm_network_security_group.hub_access.security_rule : rule
+      if(
+        rule.name == "AllowHttpsToInternet" &&
+        rule.priority == 100 &&
+        rule.direction == "Outbound" &&
+        rule.access == "Allow" &&
+        rule.protocol == "Tcp" &&
+        rule.destination_port_range == "443" &&
+        rule.source_address_prefix == "10.0.4.0/27" &&
+        rule.destination_address_prefix == "Internet"
+      )
+    ]) == 1
+
+    error_message = "R2.3: the temporary F5 rule must allow exactly TCP/443 from 10.0.4.0/27 to Internet."
   }
 }
 

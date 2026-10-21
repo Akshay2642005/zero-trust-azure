@@ -33,6 +33,16 @@ output "hub_default_subnet_id" {
   value       = azurerm_subnet.hub_default.id
 }
 
+output "hub_access_subnet_id" {
+  description = "Resource ID of the hub access subnet."
+  value       = azurerm_subnet.hub_access.id
+}
+
+output "hub_access_nsg_id" {
+  description = "Resource ID of the hub access network security group."
+  value       = azurerm_network_security_group.hub_access.id
+}
+
 output "spoke_workload_subnet_id" {
   description = "Resource ID of the spoke workload subnet."
   value       = azurerm_subnet.spoke_workload.id

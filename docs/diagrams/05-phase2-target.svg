@@ -1,0 +1,317 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1520 1180" width="1520" height="1180" font-family="Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2b6cb0"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#2f855a"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b7791f"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#805ad5"/>
+    </marker>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="112%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#102a43" flood-opacity="0.08"/>
+    </filter>
+  </defs>
+
+  <!-- background -->
+  <rect width="1520" height="1180" fill="#f7f9fc"/>
+
+  <!-- header -->
+  <text x="48" y="52" font-size="28" font-weight="700" fill="#102a43">Zero-Trust Azure · target architecture</text>
+  <text x="48" y="78" font-size="14" fill="#486581">Phase 1 baseline + Phase 2 controlled egress · resource group zt-rg · centralindia · workloads have no public IPs</text>
+
+  <!-- legend -->
+  <rect x="985" y="20" width="495" height="70" rx="8" fill="#ffffff" stroke="#d9e2ec"/>
+  <line x1="1005" y1="42" x2="1045" y2="42" stroke="#2b6cb0" stroke-width="2.5" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+  <text x="1053" y="46" font-size="12" fill="#243b53">VNet peering</text>
+  <line x1="1170" y1="42" x2="1210" y2="42" stroke="#2f855a" stroke-width="2.5" stroke-dasharray="6 5" marker-end="url(#arrow-green)"/>
+  <text x="1218" y="46" font-size="12" fill="#243b53">allowed flow (F1)</text>
+  <line x1="1005" y1="68" x2="1045" y2="68" stroke="#b7791f" stroke-width="2.5" stroke-dasharray="6 5"/>
+  <text x="1053" y="72" font-size="12" fill="#243b53">planned · Phase 2</text>
+  <line x1="1170" y1="68" x2="1210" y2="68" stroke="#805ad5" stroke-width="2.5" stroke-dasharray="3 5"/>
+  <text x="1218" y="72" font-size="12" fill="#243b53">future · Phase 3+</text>
+
+  <!-- Azure boundary -->
+  <rect x="40" y="110" width="1060" height="850" rx="16" fill="#f0f6fc" stroke="#2b6cb0" stroke-width="2"/>
+  <text x="62" y="139" font-size="16" font-weight="700" fill="#2b6cb0">Microsoft Azure</text>
+  <text x="196" y="139" font-size="12" fill="#486581">resource group zt-rg · subscription de5432d2… · region centralindia</text>
+
+  <!-- ================= HUB VNET ================= -->
+  <g>
+    <rect x="60" y="170" width="300" height="565" rx="12" fill="#ffffff" stroke="#2b6cb0" stroke-width="1.6" filter="url(#shadow)"/>
+    <rect x="60" y="170" width="300" height="52" rx="12" fill="#ebf4ff" stroke="#2b6cb0" stroke-width="1.6"/>
+    <rect x="60" y="200" width="300" height="22" fill="#ebf4ff"/>
+    <text x="76" y="194" font-size="16" font-weight="700" fill="#1a365d">hub-vnet</text>
+    <text x="76" y="213" font-size="12" fill="#2b6cb0">10.0.0.0/16 · hub</text>
+    <text x="344" y="213" font-size="10" fill="#486581" text-anchor="end">peered: spoke, spoke2</text>
+
+    <!-- hub-default -->
+    <rect x="76" y="236" width="268" height="84" rx="8" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="88" y="258" font-size="13.5" font-weight="700" fill="#102a43">hub-default</text>
+    <text x="88" y="275" font-size="11" fill="#486581">10.0.1.0/24</text>
+    <rect x="88" y="284" width="96" height="18" rx="9" fill="#fff5f5" stroke="#c53030"/>
+    <text x="136" y="297" font-size="10" fill="#c53030" text-anchor="middle">hub-nsg · deny-all</text>
+    <text x="88" y="314" font-size="10.5" fill="#718096">no workload — empty subnet</text>
+
+    <!-- hub-access -->
+    <rect x="76" y="332" width="268" height="124" rx="8" fill="#fffaf0" stroke="#b7791f" stroke-width="1.8" stroke-dasharray="7 5"/>
+    <text x="88" y="354" font-size="13.5" font-weight="700" fill="#7b341e">hub-access</text>
+    <text x="88" y="371" font-size="11" fill="#975a16">10.0.4.0/27 · room for 2 connectors</text>
+    <rect x="232" y="340" width="100" height="17" rx="8.5" fill="#fefcbf" stroke="#b7791f"/>
+    <text x="282" y="352" font-size="9.5" fill="#975a16" text-anchor="middle">NEW · Phase 2</text>
+    <rect x="88" y="380" width="128" height="18" rx="9" fill="#fff5f5" stroke="#c53030"/>
+    <text x="152" y="393" font-size="9.5" fill="#c53030" text-anchor="middle">hub-access-nsg · deny-all</text>
+    <text x="224" y="393" font-size="10" fill="#2f855a">+ TEMP outbound 443</text>
+    <text x="88" y="413" font-size="10.5" fill="#718096">Twingate connector lands here (Phase 3)</text>
+    <text x="88" y="429" font-size="10.5" fill="#718096">No public IP on the VM / NIC</text>
+    <text x="88" y="445" font-size="10.5" fill="#718096">Egress only via NAT Gateway</text>
+
+    <!-- reserved firewall -->
+    <rect x="76" y="468" width="268" height="80" rx="8" fill="#f8fafc" stroke="#cbd5e0" stroke-dasharray="4 4"/>
+    <text x="88" y="488" font-size="12" font-weight="700" fill="#718096">Reserved for Phase 6</text>
+    <text x="88" y="505" font-size="10.5" fill="#718096">AzureFirewallSubnet · 10.0.2.0/26</text>
+    <text x="88" y="521" font-size="10.5" fill="#718096">AzureFirewallManagementSubnet · 10.0.3.0/26</text>
+    <text x="88" y="538" font-size="10" fill="#a0aec0">address space already planned, not deployed</text>
+
+    <!-- NAT gateway -->
+    <rect x="76" y="564" width="268" height="148" rx="8" fill="#fffaf0" stroke="#b7791f" stroke-width="1.6" stroke-dasharray="7 5"/>
+    <text x="88" y="586" font-size="13" font-weight="700" fill="#7b341e">NAT Gateway · Standard</text>
+    <text x="88" y="604" font-size="10.5" fill="#975a16">Static public IP · outbound SNAT only</text>
+    <text x="88" y="621" font-size="10.5" fill="#975a16">Associated with hub-access only</text>
+    <rect x="88" y="631" width="150" height="18" rx="9" fill="#ffffff" stroke="#b7791f"/>
+    <text x="163" y="644" font-size="9.5" fill="#975a16" text-anchor="middle">no inbound listener / port map</text>
+    <text x="88" y="667" font-size="10.5" fill="#718096">deploy_egress_nat = false (default)</text>
+    <text x="88" y="683" font-size="10.5" fill="#718096">≈ $35–40 / month while enabled</text>
+    <text x="88" y="701" font-size="10" fill="#a0aec0">NAT public IP ≠ workload public IP</text>
+
+    <!-- subnet association -->
+    <line x1="210" y1="456" x2="210" y2="564" stroke="#b7791f" stroke-width="1.6" stroke-dasharray="2 4"/>
+    <text x="218" y="514" font-size="9.5" fill="#975a16">subnet association</text>
+  </g>
+
+  <!-- ================= SPOKE VNET ================= -->
+  <g>
+    <rect x="410" y="170" width="295" height="565" rx="12" fill="#ffffff" stroke="#2f855a" stroke-width="1.6" filter="url(#shadow)"/>
+    <rect x="410" y="170" width="295" height="52" rx="12" fill="#e6fffa" stroke="#2f855a" stroke-width="1.6"/>
+    <rect x="410" y="200" width="295" height="22" fill="#e6fffa"/>
+    <text x="426" y="194" font-size="16" font-weight="700" fill="#22543d">spoke-vnet</text>
+    <text x="426" y="213" font-size="12" fill="#2f855a">10.1.0.0/16 · workload spoke</text>
+
+    <!-- spoke-workload -->
+    <rect x="426" y="236" width="263" height="124" rx="8" fill="#f0fff4" stroke="#2f855a" stroke-width="1.2"/>
+    <text x="438" y="258" font-size="13.5" font-weight="700" fill="#102a43">spoke-workload</text>
+    <text x="438" y="275" font-size="11" fill="#486581">10.1.0.0/24 · VM 1 (Phase 4)</text>
+    <rect x="438" y="284" width="105" height="18" rx="9" fill="#fff5f5" stroke="#c53030"/>
+    <text x="490" y="297" font-size="9.5" fill="#c53030" text-anchor="middle">spoke-nsg · deny-all</text>
+    <text x="552" y="297" font-size="9.5" fill="#2f855a">+ allow 443</text>
+    <text x="438" y="315" font-size="10.5" fill="#486581">HTTPS server :443 · SSH :22</text>
+    <text x="438" y="331" font-size="10.5" fill="#2f855a">Inbound 443 from 10.2.0.0/24 (F1)</text>
+    <text x="438" y="347" font-size="10.5" fill="#486581">Managed identity → storage (V6)</text>
+
+    <!-- private endpoints -->
+    <rect x="426" y="372" width="263" height="100" rx="8" fill="#f8fafc" stroke="#94a3b8"/>
+    <text x="438" y="394" font-size="13.5" font-weight="700" fill="#102a43">spoke-private-endpoints</text>
+    <text x="438" y="411" font-size="11" fill="#486581">10.1.1.0/24</text>
+    <rect x="438" y="420" width="92" height="18" rx="9" fill="#edf2f7" stroke="#718096"/>
+    <text x="484" y="433" font-size="9.5" fill="#4a5568" text-anchor="middle">no NSG, by design</text>
+    <text x="540" y="433" font-size="9.5" fill="#486581">private link</text>
+    <text x="438" y="459" font-size="10.5" fill="#486581">PE NIC → blob private endpoint</text>
+
+    <!-- storage -->
+    <rect x="426" y="486" width="263" height="110" rx="8" fill="#ffffff" stroke="#cbd5e0"/>
+    <text x="438" y="508" font-size="13" font-weight="700" fill="#102a43">Storage account</text>
+    <text x="438" y="525" font-size="10.5" fill="#486581">Public network access: disabled</text>
+    <text x="438" y="541" font-size="10.5" fill="#486581">Private DNS: privatelink.blob…</text>
+    <text x="438" y="557" font-size="10.5" fill="#b7791f">Zone link: spoke-vnet only ⚠</text>
+    <text x="438" y="575" font-size="10" fill="#718096">Hub / spoke2 cannot resolve it yet</text>
+    <text x="438" y="590" font-size="10" fill="#718096">(R3.3 adds the links in Phase 3)</text>
+  </g>
+
+  <!-- ================= SPOKE2 VNET ================= -->
+  <g>
+    <rect x="755" y="170" width="330" height="565" rx="12" fill="#ffffff" stroke="#805ad5" stroke-width="1.6" filter="url(#shadow)"/>
+    <rect x="755" y="170" width="330" height="52" rx="12" fill="#faf5ff" stroke="#805ad5" stroke-width="1.6"/>
+    <rect x="755" y="200" width="330" height="22" fill="#faf5ff"/>
+    <text x="771" y="194" font-size="16" font-weight="700" fill="#44337a">spoke2-vnet</text>
+    <text x="771" y="213" font-size="12" fill="#805ad5">10.2.0.0/16 · client spoke</text>
+
+    <!-- spoke2 workload -->
+    <rect x="771" y="236" width="298" height="124" rx="8" fill="#faf5ff" stroke="#805ad5" stroke-width="1.2"/>
+    <text x="783" y="258" font-size="13.5" font-weight="700" fill="#102a43">spoke2-workload</text>
+    <text x="783" y="275" font-size="11" fill="#486581">10.2.0.0/24 · VM 2 (Phase 4)</text>
+    <rect x="783" y="284" width="112" height="18" rx="9" fill="#fff5f5" stroke="#c53030"/>
+    <text x="839" y="297" font-size="9.5" fill="#c53030" text-anchor="middle">spoke2-nsg · deny-all</text>
+    <text x="903" y="297" font-size="9.5" fill="#2f855a">+ allow 443</text>
+    <text x="783" y="315" font-size="10.5" fill="#486581">Client VM · no public IP</text>
+    <text x="783" y="331" font-size="10.5" fill="#2f855a">Outbound 443 to 10.1.0.0/24 (F1)</text>
+    <text x="783" y="347" font-size="10.5" fill="#c53030">Everything else denied (V2–V4)</text>
+
+    <!-- no workloads -->
+    <rect x="771" y="372" width="298" height="100" rx="8" fill="#f8fafc" stroke="#cbd5e0"/>
+    <text x="783" y="394" font-size="12.5" font-weight="700" fill="#4a5568">No workloads yet</text>
+    <text x="783" y="412" font-size="10.5" fill="#718096">Peered directly to hub and spoke1.</text>
+    <text x="783" y="428" font-size="10.5" fill="#718096">The direct spoke↔spoke peering is</text>
+    <text x="783" y="444" font-size="10.5" fill="#718096">what carries F1 — no NVA in the path.</text>
+
+    <!-- still denied -->
+    <rect x="771" y="486" width="298" height="110" rx="8" fill="#fff5f5" stroke="#e2a8a8"/>
+    <text x="783" y="508" font-size="12.5" font-weight="700" fill="#742a2a">Still denied in the target state</text>
+    <text x="783" y="527" font-size="10.5" fill="#742a2a">VM2 → VM1 :22 / :80 (V2, V3)</text>
+    <text x="783" y="544" font-size="10.5" fill="#742a2a">VM1 → VM2 :any (V4)</text>
+    <text x="783" y="561" font-size="10.5" fill="#742a2a">VM1 → Internet :443 (V5)</text>
+    <text x="783" y="578" font-size="10.5" fill="#742a2a">VM2 → storage :443 (V7)</text>
+    <text x="783" y="594" font-size="10" fill="#9b2c2c">only the flow register is allowed</text>
+  </g>
+
+  <!-- ================= PEERINGS ================= -->
+  <g>
+    <!-- hub <-> spoke -->
+    <line x1="360" y1="196" x2="410" y2="196" stroke="#2b6cb0" stroke-width="2.4" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+    <!-- hub <-> spoke2 routed above the cards -->
+    <path d="M360 214 H380 V158 H1040 V214 H1085" fill="none" stroke="#2b6cb0" stroke-width="2.2" marker-start="url(#arrow-blue)" marker-end="url(#arrow-blue)"/>
+    <text x="700" y="150" font-size="11" fill="#2b6cb0" text-anchor="middle">VNet peering · hub ↔ spoke2</text>
+    <!-- direct spoke <-> spoke2 -->
+    <line x1="755" y1="300" x2="705" y2="300" stroke="#2f855a" stroke-width="2.6" stroke-dasharray="7 5" marker-end="url(#arrow-green)"/>
+    <text x="730" y="289" font-size="10.5" fill="#2f855a" text-anchor="middle">F1 · 443</text>
+  </g>
+
+  <!-- ================= EGRESS PATH ================= -->
+  <g>
+    <path d="M210 712 V770 H1140" fill="none" stroke="#b7791f" stroke-width="2.4" stroke-dasharray="8 5" marker-end="url(#arrow-amber)"/>
+    <text x="640" y="758" font-size="11.5" fill="#975a16" text-anchor="middle">TEMP: hub-access → Internet TCP/443 (all destinations)</text>
+    <circle cx="900" cy="792" r="10" fill="#b7791f"/>
+    <text x="900" y="796" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+  </g>
+
+  <!-- ================= POLICY STRIP ================= -->
+  <g>
+    <rect x="60" y="830" width="900" height="100" rx="10" fill="#ffffff" stroke="#2b6cb0" stroke-width="1.2"/>
+    <text x="76" y="856" font-size="13.5" font-weight="700" fill="#1a365d">Azure Policy · assigned at resource-group scope</text>
+    <text x="76" y="880" font-size="11.5" fill="#486581">Deny public IP on a NIC   ·   deny storage public network access   ·   deny inbound 22/3389 from Internet</text>
+    <text x="76" y="900" font-size="11.5" fill="#486581">Deny storage TLS below 1.2   ·   audit required tags (managed-by, project, environment)</text>
+    <text x="76" y="919" font-size="10.5" fill="#718096">8 policy assignments · 1 custom NSG definition · enforced, not audit-only</text>
+  </g>
+
+  <!-- ================= EXTERNAL ================= -->
+  <g>
+    <!-- laptop -->
+    <rect x="1140" y="330" width="200" height="100" rx="10" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="1.4" stroke-dasharray="5 4"/>
+    <text x="1240" y="360" font-size="14" font-weight="700" fill="#1a365d" text-anchor="middle">Twingate client</text>
+    <text x="1240" y="380" font-size="11" fill="#486581" text-anchor="middle">laptop · developer / auditor</text>
+    <text x="1240" y="398" font-size="10" fill="#718096" text-anchor="middle">Phase 3 · no VPN concentrator</text>
+    <text x="1240" y="415" font-size="10" fill="#718096" text-anchor="middle">identity checked by Entra ID</text>
+
+    <!-- twingate cloud -->
+    <rect x="1140" y="520" width="200" height="100" rx="10" fill="#faf5ff" stroke="#805ad5" stroke-width="1.4" stroke-dasharray="5 4"/>
+    <text x="1240" y="550" font-size="14" font-weight="700" fill="#44337a" text-anchor="middle">Twingate Cloud</text>
+    <text x="1240" y="570" font-size="11" fill="#553c9a" text-anchor="middle">control plane + relay</text>
+    <text x="1240" y="588" font-size="10" fill="#718096" text-anchor="middle">connector dials out, keeps</text>
+    <text x="1240" y="604" font-size="10" fill="#718096" text-anchor="middle">the tunnel open</text>
+
+    <!-- internet -->
+    <rect x="1140" y="720" width="200" height="100" rx="10" fill="#ffffff" stroke="#4a5568" stroke-width="1.4"/>
+    <text x="1240" y="750" font-size="14" font-weight="700" fill="#1a202c" text-anchor="middle">Internet</text>
+    <text x="1240" y="770" font-size="10.5" fill="#4a5568" text-anchor="middle">NAT source IP only</text>
+    <text x="1240" y="786" font-size="10.5" fill="#4a5568" text-anchor="middle">no inbound ports</text>
+    <text x="1240" y="804" font-size="10" fill="#718096" text-anchor="middle">no public IP on connector VM</text>
+
+    <!-- links -->
+    <line x1="1240" y1="430" x2="1240" y2="520" stroke="#805ad5" stroke-width="2" stroke-dasharray="3 5" marker-end="url(#arrow-purple)"/>
+    <text x="1252" y="478" font-size="9.5" fill="#805ad5">client session</text>
+    <line x1="1240" y1="720" x2="1240" y2="620" stroke="#b7791f" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#arrow-amber)"/>
+    <text x="1252" y="675" font-size="9.5" fill="#975a16">TLS 443</text>
+
+    <!-- note -->
+    <rect x="1140" y="850" width="200" height="86" rx="8" fill="#fffaf0" stroke="#b7791f" stroke-dasharray="5 4"/>
+    <text x="1152" y="872" font-size="11" font-weight="700" fill="#7b341e">Zero-trust direction</text>
+    <text x="1152" y="890" font-size="10" fill="#975a16">Connector initiates outbound.</text>
+    <text x="1152" y="906" font-size="10" fill="#975a16">Nothing on the internet can</text>
+    <text x="1152" y="922" font-size="10" fill="#975a16">reach Azure directly.</text>
+  </g>
+
+  <!-- improvement markers on the diagram -->
+  <g>
+    <circle cx="730" cy="326" r="10" fill="#c53030"/>
+    <text x="730" y="330" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+
+    <circle cx="670" cy="557" r="10" fill="#b7791f"/>
+    <text x="670" y="561" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+
+    <circle cx="344" cy="314" r="10" fill="#4a5568"/>
+    <text x="344" y="318" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+
+    <circle cx="1074" cy="900" r="10" fill="#2b6cb0"/>
+    <text x="1074" y="904" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+    <text x="1054" y="924" font-size="9.5" fill="#486581" text-anchor="end">no flow logs / diagnostics yet</text>
+  </g>
+
+  <!-- ================= IMPROVEMENTS ================= -->
+  <g>
+    <text x="42" y="1007" font-size="16" font-weight="700" fill="#102a43">Improvement opportunities</text>
+    <text x="330" y="1007" font-size="11.5" fill="#718096">ranked by impact on the zero-trust story</text>
+
+    <!-- card 1 -->
+    <rect x="40" y="1022" width="230" height="112" rx="9" fill="#ffffff" stroke="#e4e7eb"/>
+    <circle cx="62" cy="1046" r="11" fill="#c53030"/>
+    <text x="62" y="1050" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+    <text x="80" y="1050" font-size="12.5" font-weight="700" fill="#102a43">Inspection gap</text>
+    <text x="54" y="1072" font-size="10.5" fill="#486581">Direct spoke↔spoke peering</text>
+    <text x="54" y="1088" font-size="10.5" fill="#486581">carries F1 with no firewall in</text>
+    <text x="54" y="1104" font-size="10.5" fill="#486581">the path. Phase 6 fixes it.</text>
+    <text x="54" y="1122" font-size="10" fill="#c53030">accepted risk until then</text>
+
+    <!-- card 2 -->
+    <rect x="283" y="1022" width="230" height="112" rx="9" fill="#ffffff" stroke="#e4e7eb"/>
+    <circle cx="305" cy="1046" r="11" fill="#b7791f"/>
+    <text x="305" y="1050" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+    <text x="323" y="1050" font-size="12.5" font-weight="700" fill="#102a43">Port-wide egress</text>
+    <text x="297" y="1072" font-size="10.5" fill="#486581">NAT allows 443 to any host,</text>
+    <text x="297" y="1088" font-size="10.5" fill="#486581">not just Twingate. Replace</text>
+    <text x="297" y="1104" font-size="10.5" fill="#486581">with Firewall FQDN rules.</text>
+    <text x="297" y="1122" font-size="10" fill="#b7791f">F5 is temporary</text>
+
+    <!-- card 3 -->
+    <rect x="526" y="1022" width="230" height="112" rx="9" fill="#ffffff" stroke="#e4e7eb"/>
+    <circle cx="548" cy="1046" r="11" fill="#b7791f"/>
+    <text x="548" y="1050" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+    <text x="566" y="1050" font-size="12.5" font-weight="700" fill="#102a43">DNS link gap</text>
+    <text x="540" y="1072" font-size="10.5" fill="#486581">Blob private zone is linked</text>
+    <text x="540" y="1088" font-size="10.5" fill="#486581">to spoke only. Hub and spoke2</text>
+    <text x="540" y="1104" font-size="10.5" fill="#486581">cannot resolve the PE yet.</text>
+    <text x="540" y="1122" font-size="10" fill="#b7791f">do it with R3.3</text>
+
+    <!-- card 4 -->
+    <rect x="769" y="1022" width="230" height="112" rx="9" fill="#ffffff" stroke="#e4e7eb"/>
+    <circle cx="791" cy="1046" r="11" fill="#4a5568"/>
+    <text x="791" y="1050" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+    <text x="809" y="1050" font-size="12.5" font-weight="700" fill="#102a43">Empty hub-default</text>
+    <text x="783" y="1072" font-size="10.5" fill="#486581">A /24 plus an NSG with no</text>
+    <text x="783" y="1088" font-size="10.5" fill="#486581">workload. Remove it, or use</text>
+    <text x="783" y="1104" font-size="10.5" fill="#486581">it for DNS / ops services.</text>
+    <text x="783" y="1122" font-size="10" fill="#718096">shrink the surface</text>
+
+    <!-- card 5 -->
+    <rect x="1012" y="1022" width="230" height="112" rx="9" fill="#ffffff" stroke="#e4e7eb"/>
+    <circle cx="1034" cy="1046" r="11" fill="#2b6cb0"/>
+    <text x="1034" y="1050" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+    <text x="1052" y="1050" font-size="12.5" font-weight="700" fill="#102a43">No traffic evidence</text>
+    <text x="1026" y="1072" font-size="10.5" fill="#486581">NSG flow logs / diagnostics</text>
+    <text x="1026" y="1088" font-size="10.5" fill="#486581">arrive in Phase 5. Pull them</text>
+    <text x="1026" y="1104" font-size="10.5" fill="#486581">forward for denied-flow proof.</text>
+    <text x="1026" y="1122" font-size="10" fill="#2b6cb0">evidence, not just intent</text>
+
+    <!-- card 6 -->
+    <rect x="1255" y="1022" width="225" height="112" rx="9" fill="#ffffff" stroke="#e4e7eb"/>
+    <circle cx="1277" cy="1046" r="11" fill="#2f855a"/>
+    <text x="1277" y="1050" font-size="11" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+    <text x="1295" y="1050" font-size="12.5" font-weight="700" fill="#102a43">Cost &amp; guardrails</text>
+    <text x="1269" y="1072" font-size="10.5" fill="#486581">NAT ≈ $35–40/mo. Keep the</text>
+    <text x="1269" y="1088" font-size="10.5" fill="#486581">flag off, add a budget alert</text>
+    <text x="1269" y="1104" font-size="10.5" fill="#486581">and protect the main branch.</text>
+    <text x="1269" y="1122" font-size="10" fill="#2f855a">cheap insurance</text>
+  </g>
+</svg>

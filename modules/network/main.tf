@@ -47,9 +47,10 @@ locals {
   ])
 
   nsg_resources = {
-    hub    = azurerm_network_security_group.hub
-    spoke  = azurerm_network_security_group.spoke
-    spoke2 = azurerm_network_security_group.spoke2
+    hub        = azurerm_network_security_group.hub
+    hub_access = azurerm_network_security_group.hub_access
+    spoke      = azurerm_network_security_group.spoke
+    spoke2     = azurerm_network_security_group.spoke2
   }
 
   # Every Allow rule that uses a wildcard address prefix, tagged with the field
@@ -103,6 +104,50 @@ resource "azurerm_network_security_group" "hub" {
       destination_port_range     = "*"
       source_address_prefix      = "*"
       destination_address_prefix = "*"
+    }
+  }
+}
+
+resource "azurerm_network_security_group" "hub_access" {
+  name                = var.naming.hub_access_nsg
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tags                = var.tags
+
+  dynamic "security_rule" {
+    for_each = local.deny_all_rules
+
+    content {
+      name                       = security_rule.key
+      priority                   = security_rule.value.priority
+      direction                  = security_rule.value.direction
+      access                     = "Deny"
+      protocol                   = "*"
+      source_port_range          = "*"
+      destination_port_range     = "*"
+      source_address_prefix      = "*"
+      destination_address_prefix = "*"
+    }
+  }
+
+  # TEMP F5 (ADR-006): the connector has no public IP and no implicit outbound
+  # access, so while NAT is the egress path this subnet needs HTTPS out. The
+  # rule is destination-wide because an NSG cannot express FQDNs; Phase 6
+  # replaces it with Azure Firewall application rules and removes this allow.
+  dynamic "security_rule" {
+    for_each = var.allow_hub_access_internet_443 ? [1] : []
+
+    content {
+      name                       = "AllowHttpsToInternet"
+      priority                   = 100
+      direction                  = "Outbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "443"
+      source_address_prefix      = var.hub_access_subnet_prefix
+      destination_address_prefix = "Internet"
+      description                = "TEMP F5 (ADR-006): connector egress to Twingate. Replaced by Firewall FQDN rules in Phase 6."
     }
   }
 }
@@ -230,6 +275,16 @@ resource "azurerm_subnet" "hub_default" {
   address_prefixes     = [var.hub_default_subnet_prefix]
 }
 
+# Dedicated subnet for the Twingate connector. It is deliberately separate
+# from hub-default so the connector's temporary egress exception and, later,
+# its narrow inbound rules cannot widen the empty hub subnet's policy.
+resource "azurerm_subnet" "hub_access" {
+  name                 = var.naming.hub_access_subnet
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.hub.name
+  address_prefixes     = [var.hub_access_subnet_prefix]
+}
+
 resource "azurerm_subnet" "spoke_workload" {
   name                 = var.naming.spoke_workload_subnet
   resource_group_name  = var.resource_group_name
@@ -258,6 +313,11 @@ resource "azurerm_subnet" "spoke2_workload" {
 resource "azurerm_subnet_network_security_group_association" "hub_default" {
   subnet_id                 = azurerm_subnet.hub_default.id
   network_security_group_id = azurerm_network_security_group.hub.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "hub_access" {
+  subnet_id                 = azurerm_subnet.hub_access.id
+  network_security_group_id = azurerm_network_security_group.hub_access.id
 }
 
 resource "azurerm_subnet_network_security_group_association" "spoke_workload" {

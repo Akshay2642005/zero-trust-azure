@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [network, storage, policy]
+        module: [network, storage, policy, egress]
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
@@ -58,7 +58,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        module: [network, storage]
+        module: [network, storage, egress]
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3

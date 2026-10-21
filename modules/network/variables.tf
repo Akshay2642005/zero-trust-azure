@@ -16,10 +16,12 @@ variable "naming" {
     spoke_vnet              = string
     spoke2_vnet             = string
     hub_default_subnet      = string
+    hub_access_subnet       = optional(string, "hub-access")
     spoke_workload_subnet   = string
     spoke_pe_subnet         = string
     spoke2_workload_subnet  = string
     hub_nsg                 = string
+    hub_access_nsg          = optional(string, "hub-access-nsg")
     spoke_nsg               = string
     spoke2_nsg              = string
     hub_to_spoke_peering    = string
@@ -47,6 +49,23 @@ variable "hub_default_subnet_prefix" {
   description = "Address prefix for the hub default subnet."
   type        = string
   default     = "10.0.1.0/24"
+}
+
+variable "hub_access_subnet_prefix" {
+  description = "Address prefix for the hub access subnet that hosts the Twingate connector."
+  type        = string
+  default     = "10.0.4.0/27"
+
+  validation {
+    condition     = can(cidrhost(var.hub_access_subnet_prefix, 0))
+    error_message = "hub_access_subnet_prefix must be a valid IPv4 CIDR."
+  }
+}
+
+variable "allow_hub_access_internet_443" {
+  description = "Temporary F5 exception: allow TCP/443 from the hub access subnet to the Internet. Enabled only while the NAT Gateway is the connector's egress path; replaced by Azure Firewall FQDN rules in Phase 6 (ADR-006)."
+  type        = bool
+  default     = false
 }
 
 variable "spoke_workload_subnet_prefix" {
@@ -95,6 +114,12 @@ variable "nsg_allowlist_exceptions" {
       rule   = "AllowHttpsToSpoke1Workload"
       field  = "source_address_prefix"
       reason = "Outbound rule; the destination is pinned to the spoke workload prefix."
+    },
+    {
+      nsg    = "hub_access"
+      rule   = "AllowHttpsToInternet"
+      field  = "destination_address_prefix"
+      reason = "TEMP F5 (ADR-006): connector egress to Twingate while the NAT Gateway is the path. Removed in Phase 6 when Firewall FQDN rules land."
     },
   ]
 }
