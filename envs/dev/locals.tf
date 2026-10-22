@@ -106,8 +106,8 @@ locals {
                 },
               ]
             }
-            greater = 0
           }
+          greater = 0
         },
       ]
     }
