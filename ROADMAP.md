@@ -98,7 +98,7 @@ Watch out: Checkov will flag things like customer-managed keys and geo-replicati
 
 **Goal:** a place for the connector to live, with a deliberate, temporary way out.
 **Spec:** R2.1 to R2.4
-**Status:** code, tests, registry release and plan complete; real apply pending.
+**Status:** complete. Applied 2026-10-22; NAT is enabled for Phase 3.
 
 Checklist
 - [x] ADR-006 written
@@ -107,11 +107,17 @@ Checklist
 - [x] `hub-access` NSG: outbound TCP/443 to `Internet` service tag, tagged as temporary
 - [x] Add to accepted-exceptions table: "temporary Internet:443 from hub-access (removed Phase 6)"
 - [x] Output NAT public IP
-- [ ] Test: NAT policy interplay (does the NIC public-IP policy object?) (Q4) — needs the real apply
+- [x] Test: NAT policy interplay (does the NIC public-IP policy object?) (Q4) — the built-in policy scope is `Microsoft.Network/networkInterfaces` only; the NAT public IP is a standalone `publicIPAddresses` resource, so it is not evaluated
 - [x] Publish `network-v1.2.0` and `egress-v0.1.0`, wire `envs/dev` to them
 - [x] Remote plan with `deploy_egress_nat=true`: 40 resources, no errors
+- [x] Apply with `deploy_egress_nat=true`; `terraform plan` afterwards reports no changes
 
-Done when: `deploy_egress_nat=true` applies cleanly and only `hub-access` has NAT.
+Evidence: apply created 40 resources; NAT public IP `20.197.27.205` is attached only to
+`hub-access-nat`, and `hub-access` is the only subnet with a `natGateway`. The first
+apply exposed an invalid custom policy rule (`greater` nested inside `count`); fixed
+in `2f26084` and the remaining 8 policy resources applied cleanly.
+
+Done when: `deploy_egress_nat=true` applies cleanly and only `hub-access` has NAT. **Met.**
 
 ---
 
