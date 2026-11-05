@@ -64,8 +64,9 @@ module "storage" {
 # and zero-trust resources in the hub-access subnet.
 # Gated by var.deploy_connector (Phase 3).
 module "access" {
-  source = "../../modules/access"
-  count  = var.deploy_connector ? 1 : 0
+  source  = "app.terraform.io/akshay2642005/access/azurerm"
+  version = "0.1.0"
+  count   = var.deploy_connector ? 1 : 0
 
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
