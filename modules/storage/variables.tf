@@ -31,6 +31,14 @@ variable "vnet_id" {
   type        = string
 }
 
+variable "extra_vnet_links" {
+  description = "Additional VNet IDs to link to the blob private DNS zone (e.g. hub, spoke2). Each entry needs a unique name and the VNet resource ID."
+  type = map(object({
+    vnet_id = string
+  }))
+  default = {}
+}
+
 variable "account_tier" {
   description = "Storage account performance tier."
   type        = string

@@ -60,6 +60,24 @@ module "storage" {
   tags = local.common_tags
 }
 
+# Access module: provisions Twingate remote network, connector tokens, connector VM,
+# and zero-trust resources in the hub-access subnet.
+# Gated by var.deploy_connector (Phase 3).
+module "access" {
+  source = "../../modules/access"
+  count  = var.deploy_connector ? 1 : 0
+
+  resource_group_name = azurerm_resource_group.this.name
+  location            = azurerm_resource_group.this.location
+  naming              = local.access_naming
+  subnet_id           = module.network.hub_access_subnet_id
+
+  ssh_public_key   = var.connector_ssh_public_key
+  twingate_network = var.twingate_network
+
+  tags = local.common_tags
+}
+
 module "policy" {
   source   = "app.terraform.io/akshay2642005/policy/azurerm"
   version  = "1.1.0"

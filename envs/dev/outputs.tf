@@ -60,3 +60,13 @@ output "policy_assignment_ids" {
     { for name, assignment in module.policy : name => assignment.id },
   )
 }
+
+output "connector_private_ip" {
+  description = "Private IP of the Twingate connector VM, or null if deploy_connector is false."
+  value       = one(module.access[*].connector_private_ip)
+}
+
+output "twingate_remote_network_id" {
+  description = "Resource ID of the Twingate remote network, or null if deploy_connector is false."
+  value       = one(module.access[*].remote_network_id)
+}

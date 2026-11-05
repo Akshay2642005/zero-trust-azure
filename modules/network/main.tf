@@ -150,6 +150,42 @@ resource "azurerm_network_security_group" "hub_access" {
       description                = "TEMP F5 (ADR-006): connector egress to Twingate. Replaced by Firewall FQDN rules in Phase 6."
     }
   }
+
+  # F2: connector -> spoke workload on SSH (22) and HTTPS (443).
+  dynamic "security_rule" {
+    for_each = var.allow_connector_to_spoke ? [1] : []
+
+    content {
+      name                       = "AllowSshHttpsToSpokeWorkload"
+      priority                   = 110
+      direction                  = "Outbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_ranges    = ["22", "443"]
+      source_address_prefix      = var.hub_access_subnet_prefix
+      destination_address_prefix = var.spoke_workload_subnet_prefix
+      description                = "F2: connector egress to spoke workload for SSH and HTTPS access."
+    }
+  }
+
+  # F3: connector -> spoke PE subnet on HTTPS (443) for storage/Key Vault endpoints.
+  dynamic "security_rule" {
+    for_each = var.allow_connector_to_spoke ? [1] : []
+
+    content {
+      name                       = "AllowHttpsToSpokePE"
+      priority                   = 120
+      direction                  = "Outbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_range     = "443"
+      source_address_prefix      = var.hub_access_subnet_prefix
+      destination_address_prefix = var.spoke_pe_subnet_prefix
+      description                = "F3: connector egress to spoke private endpoints (storage, Key Vault)."
+    }
+  }
 }
 
 resource "azurerm_network_security_group" "spoke" {
@@ -186,6 +222,24 @@ resource "azurerm_network_security_group" "spoke" {
     destination_port_range     = "443"
     source_address_prefix      = var.spoke2_workload_subnet_prefix
     destination_address_prefix = var.spoke_workload_subnet_prefix
+  }
+
+  # F2: inbound from connector on SSH (22) and HTTPS (443).
+  dynamic "security_rule" {
+    for_each = var.allow_connector_to_spoke ? [1] : []
+
+    content {
+      name                       = "AllowSshHttpsFromConnector"
+      priority                   = 110
+      direction                  = "Inbound"
+      access                     = "Allow"
+      protocol                   = "Tcp"
+      source_port_range          = "*"
+      destination_port_ranges    = ["22", "443"]
+      source_address_prefix      = var.hub_access_subnet_prefix
+      destination_address_prefix = var.spoke_workload_subnet_prefix
+      description                = "F2: connector ingress for SSH and HTTPS access to spoke workloads."
+    }
   }
 }
 

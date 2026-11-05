@@ -21,6 +21,7 @@ No modules.
 | Name | Type |
 | ---- | ---- |
 | [azurerm_private_dns_zone.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_zone) | resource |
+| [azurerm_private_dns_zone_virtual_network_link.extra](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_zone_virtual_network_link) | resource |
 | [azurerm_private_dns_zone_virtual_network_link.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_dns_zone_virtual_network_link) | resource |
 | [azurerm_private_endpoint.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/private_endpoint) | resource |
 | [azurerm_storage_account.this](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/storage_account) | resource |
@@ -38,6 +39,7 @@ No modules.
 | <a name="input_account_tier"></a> [account\_tier](#input\_account\_tier) | Storage account performance tier. | `string` | `"Standard"` | no |
 | <a name="input_blob_soft_delete_days"></a> [blob\_soft\_delete\_days](#input\_blob\_soft\_delete\_days) | Number of days soft-deleted blobs are retained. | `number` | `7` | no |
 | <a name="input_container_soft_delete_days"></a> [container\_soft\_delete\_days](#input\_container\_soft\_delete\_days) | Number of days soft-deleted containers are retained. | `number` | `7` | no |
+| <a name="input_extra_vnet_links"></a> [extra\_vnet\_links](#input\_extra\_vnet\_links) | Additional VNet IDs to link to the blob private DNS zone (e.g. hub, spoke2). Each entry needs a unique name and the VNet resource ID. | <pre>map(object({<br/>    vnet_id = string<br/>  }))</pre> | `{}` | no |
 | <a name="input_shared_access_key_enabled"></a> [shared\_access\_key\_enabled](#input\_shared\_access\_key\_enabled) | Whether shared-key (account key) access is permitted. Disable for AAD-only access. | `bool` | `true` | no |
 | <a name="input_tags"></a> [tags](#input\_tags) | Tags applied to every resource that supports them. | `map(string)` | `{}` | no |
 
@@ -46,6 +48,7 @@ No modules.
 | Name | Description |
 | ---- | ----------- |
 | <a name="output_private_dns_zone_id"></a> [private\_dns\_zone\_id](#output\_private\_dns\_zone\_id) | Resource ID of the blob private DNS zone. |
+| <a name="output_private_dns_zone_name"></a> [private\_dns\_zone\_name](#output\_private\_dns\_zone\_name) | Name of the blob private DNS zone. |
 | <a name="output_private_endpoint_id"></a> [private\_endpoint\_id](#output\_private\_endpoint\_id) | Resource ID of the blob private endpoint. |
 | <a name="output_private_endpoint_ip"></a> [private\_endpoint\_ip](#output\_private\_endpoint\_ip) | Private IP address allocated to the blob private endpoint. |
 | <a name="output_storage_account_id"></a> [storage\_account\_id](#output\_storage\_account\_id) | Resource ID of the storage account. |

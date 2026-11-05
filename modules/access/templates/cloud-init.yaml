@@ -1,0 +1,15 @@
+#cloud-config
+# Twingate connector installation via cloud-init.
+# ADR-003: tokens are delivered via custom_data in Phase 3.
+
+runcmd:
+  - |
+    # Install the Twingate connector
+    curl -s https://binaries.twingate.com/connector/setup.sh | sudo bash
+    # Configure the connector with tokens
+    sudo twingate-connector setup \
+      --access-token "${access_token}" \
+      --refresh-token "${refresh_token}" \
+      --network "${network}"
+    # Enable and start the connector service
+    sudo systemctl enable --now twingate-connector

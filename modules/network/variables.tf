@@ -68,6 +68,12 @@ variable "allow_hub_access_internet_443" {
   default     = false
 }
 
+variable "allow_connector_to_spoke" {
+  description = "Whether to add NSG rules allowing the hub-access subnet (connector) to reach the spoke workload subnet on SSH (22) and HTTPS (443), and the PE subnet on HTTPS (443). Enabled when the Twingate connector is deployed."
+  type        = bool
+  default     = false
+}
+
 variable "spoke_workload_subnet_prefix" {
   description = "Address prefix for the spoke workload subnet."
   type        = string

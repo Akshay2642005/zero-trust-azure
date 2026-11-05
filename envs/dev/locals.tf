@@ -30,6 +30,15 @@ locals {
     nat_public_ip = "hub-access-nat-ip"
   }
 
+  # Names owned by the access module.
+  access_naming = {
+    remote_network = "azure-hub-network"
+    connector      = "hub-connector-01"
+    connector_vm   = "vm-connector"
+    vm_nic         = "nic-vm-connector"
+    vm_os_disk     = "osdisk-vm-connector"
+  }
+
   # Names owned by the storage module.
   storage_naming = {
     storage_account            = var.storage_account_name

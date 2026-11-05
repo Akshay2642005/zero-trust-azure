@@ -55,6 +55,31 @@ variable "deploy_egress_nat" {
   default     = false
 }
 
+variable "deploy_connector" {
+  description = "Whether to deploy the Twingate connector VM and resources in the hub access subnet."
+  type        = bool
+  default     = false
+}
+
+variable "twingate_network" {
+  description = "Twingate network name (the subdomain in <name>.twingate.com)."
+  type        = string
+  default     = ""
+}
+
+variable "twingate_api_token" {
+  description = "Twingate API token used by the provider to configure resources and connectors."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "connector_ssh_public_key" {
+  description = "SSH public key for the connector VM admin user."
+  type        = string
+  default     = ""
+}
+
 variable "spoke_workload_subnet_prefix" {
   description = "Address prefix for the spoke workload subnet."
   type        = string

@@ -13,6 +13,11 @@ output "private_dns_zone_id" {
   value       = azurerm_private_dns_zone.this.id
 }
 
+output "private_dns_zone_name" {
+  description = "Name of the blob private DNS zone."
+  value       = azurerm_private_dns_zone.this.name
+}
+
 output "private_endpoint_id" {
   description = "Resource ID of the blob private endpoint."
   value       = azurerm_private_endpoint.this.id
