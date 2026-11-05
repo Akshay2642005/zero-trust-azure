@@ -64,13 +64,13 @@ variable "deploy_connector" {
 variable "twingate_network" {
   description = "Twingate network name (the subdomain in <name>.twingate.com)."
   type        = string
-  default     = ""
+  default     = "dummy"
 }
 
 variable "twingate_api_token" {
   description = "Twingate API token used by the provider to configure resources and connectors."
   type        = string
-  default     = ""
+  default     = "dummy-token"
   sensitive   = true
 }
 
